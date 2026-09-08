@@ -1,0 +1,109 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Class Teachers - EduGrade{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-users-cog"></i> Class Teachers</h2>
+        <a href="{% url 'teachers:class_teacher_create' %}" class="btn btn-primary">
+            <i class="fas fa-user-plus"></i> Assign Class Teacher
+        </a>
+    </div>
+    
+    <!-- Filters -->
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <select class="form-select" name="grade_level">
+                        <option value="">All Grades</option>
+                        {% for grade in grade_levels %}
+                            <option value="{{ grade.id }}">{{ grade.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" name="stream">
+                        <option value="">All Streams</option>
+                        {% for stream in streams %}
+                            <option value="{{ stream.id }}">{{ stream.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" name="academic_year">
+                        <option value="">All Years</option>
+                        {% for year in academic_years %}
+                            <option value="{{ year.id }}">{{ year.year }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" name="is_active">
+                        <option value="">All Status</option>
+                        <option value="true">Active</option>
+                        <option value="false">Inactive</option>
+                    </select>
+                </div>
+                <div class="col-md-1">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Class Teacher List -->
+    <div class="card shadow">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Class Teacher</th>
+                            <th>Grade</th>
+                            <th>Stream</th>
+                            <th>Academic Year</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ct in class_teachers %}
+                        <tr>
+                            <td>
+                                <strong>{{ ct.teacher.full_name }}</strong><br>
+                                <small class="text-muted">{{ ct.teacher.staff_number }}</small>
+                            </td>
+                            <td>{{ ct.grade_level.name }}</td>
+                            <td>{{ ct.stream.name }}</td>
+                            <td>{{ ct.academic_year.year }}</td>
+                            <td>
+                                <span class="badge bg-{% if ct.is_active %}success{% else %}secondary{% endif %}">
+                                    {% if ct.is_active %}Active{% else %}Inactive{% endif %}
+                                </span>
+                            </td>
+                            <td>
+                                <a href="{% url 'teachers:class_teacher_edit' ct.id %}" class="btn btn-sm btn-warning">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{% url 'teachers:class_teacher_delete' ct.id %}" class="btn btn-sm btn-danger">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">No class teachers assigned</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,836 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}School Setup - EduGrade{% endblock %}
+{% block page_title %}School Setup{% endblock %}
+{% block page_subtitle %}Configure school structure - Admin Only{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="row g-4 mb-4">
+    <div class="col-xl-2 col-md-4 col-6">
+        <div class="stat-card" style="border-left-color: #3b82f6;">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="stat-label">Years</div>
+                    <div class="stat-number">{{ total_years|default:0 }}</div>
+                </div>
+                <div class="stat-icon bg-info bg-opacity-10 text-info">
+                    <i class="fas fa-calendar"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 col-6">
+        <div class="stat-card" style="border-left-color: #10b981;">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="stat-label">Terms</div>
+                    <div class="stat-number">{{ total_terms|default:0 }}</div>
+                </div>
+                <div class="stat-icon bg-success bg-opacity-10 text-success">
+                    <i class="fas fa-clock"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 col-6">
+        <div class="stat-card" style="border-left-color: #8b5cf6;">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="stat-label">Curriculums</div>
+                    <div class="stat-number">{{ total_curriculums|default:0 }}</div>
+                </div>
+                <div class="stat-icon bg-purple bg-opacity-10 text-purple">
+                    <i class="fas fa-book"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 col-6">
+        <div class="stat-card" style="border-left-color: #f59e0b;">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="stat-label">Grades</div>
+                    <div class="stat-number">{{ total_grades|default:0 }}</div>
+                </div>
+                <div class="stat-icon bg-warning bg-opacity-10 text-warning">
+                    <i class="fas fa-layer-group"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 col-6">
+        <div class="stat-card" style="border-left-color: #ef4444;">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="stat-label">Streams</div>
+                    <div class="stat-number">{{ total_streams|default:0 }}</div>
+                </div>
+                <div class="stat-icon bg-danger bg-opacity-10 text-danger">
+                    <i class="fas fa-users"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-2 col-md-4 col-6">
+        <div class="stat-card" style="border-left-color: #ec4899;">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <div class="stat-label">Subjects</div>
+                    <div class="stat-number">{{ total_subjects|default:0 }}</div>
+                </div>
+                <div class="stat-icon bg-pink bg-opacity-10 text-pink">
+                    <i class="fas fa-book-open"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <h6 class="fw-bold text-muted mb-3"><i class="fas fa-plus-circle me-2"></i>Add New</h6>
+    </div>
+    <div class="col-md-2 col-4">
+        <button class="quick-action" data-bs-toggle="modal" data-bs-target="#addYearModal">
+            <i class="fas fa-calendar-plus text-primary"></i>
+            <span>Academic Year</span>
+        </button>
+    </div>
+    <div class="col-md-2 col-4">
+        <button class="quick-action" data-bs-toggle="modal" data-bs-target="#addGradeModal">
+            <i class="fas fa-layer-group text-success"></i>
+            <span>Grade Level</span>
+        </button>
+    </div>
+    <div class="col-md-2 col-4">
+        <button class="quick-action" data-bs-toggle="modal" data-bs-target="#addStreamModal">
+            <i class="fas fa-users text-warning"></i>
+            <span>Stream</span>
+        </button>
+    </div>
+    <div class="col-md-2 col-4">
+        <button class="quick-action" data-bs-toggle="modal" data-bs-target="#addSubjectModal">
+            <i class="fas fa-book-open text-info"></i>
+            <span>Subject</span>
+        </button>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- ACADEMIC YEARS SECTION -->
+<!-- ============================================ -->
+<div class="card-custom mb-4">
+    <div class="card-header">
+        <i class="fas fa-calendar me-2"></i>Academic Years
+        <button class="btn btn-sm btn-primary float-end" data-bs-toggle="modal" data-bs-target="#addYearModal">
+            <i class="fas fa-plus"></i> Add Year
+        </button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-custom table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Year</th>
+                        <th>Name</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Status</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for year in academic_years %}
+                    <tr>
+                        <td><strong>{{ year.year }}</strong></td>
+                        <td>{{ year.name }}</td>
+                        <td>{{ year.start_date|date:"Y-m-d" }}</td>
+                        <td>{{ year.end_date|date:"Y-m-d" }}</td>
+                        <td>
+                            {% if year.is_current %}
+                                <span class="badge-status bg-success text-white">Current</span>
+                            {% else %}
+                                <span class="badge-status bg-secondary text-white">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editYearModal{{ year.id }}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteYearModal{{ year.id }}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-3">No academic years defined</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- GRADE LEVELS SECTION -->
+<!-- ============================================ -->
+<div class="card-custom mb-4">
+    <div class="card-header">
+        <i class="fas fa-layer-group me-2"></i>Grade / Form Levels
+        <button class="btn btn-sm btn-success float-end" data-bs-toggle="modal" data-bs-target="#addGradeModal">
+            <i class="fas fa-plus"></i> Add Grade
+        </button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-custom table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Curriculum</th>
+                        <th>Type</th>
+                        <th>Level</th>
+                        <th>Status</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for grade in grade_levels %}
+                    <tr>
+                        <td><strong>{{ grade.name }}</strong></td>
+                        <td>{{ grade.curriculum.name }}</td>
+                        <td>{{ grade.get_level_type_display }}</td>
+                        <td>{{ grade.level_number }}</td>
+                        <td>
+                            {% if grade.is_active %}
+                                <span class="badge-status bg-success text-white">Active</span>
+                            {% else %}
+                                <span class="badge-status bg-secondary text-white">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editGradeModal{{ grade.id }}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteGradeModal{{ grade.id }}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-3">No grade levels defined</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- STREAMS SECTION -->
+<!-- ============================================ -->
+<div class="card-custom mb-4">
+    <div class="card-header">
+        <i class="fas fa-users me-2"></i>Streams / Classes
+        <button class="btn btn-sm btn-warning float-end" data-bs-toggle="modal" data-bs-target="#addStreamModal">
+            <i class="fas fa-plus"></i> Add Stream
+        </button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-custom table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Code</th>
+                        <th>Grade Level</th>
+                        <th>Capacity</th>
+                        <th>Status</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stream in streams %}
+                    <tr>
+                        <td><strong>{{ stream.name }}</strong></td>
+                        <td><span class="badge bg-secondary">{{ stream.code }}</span></td>
+                        <td>{{ stream.grade_level.name }}</td>
+                        <td>{{ stream.capacity }}</td>
+                        <td>
+                            {% if stream.is_active %}
+                                <span class="badge-status bg-success text-white">Active</span>
+                            {% else %}
+                                <span class="badge-status bg-secondary text-white">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editStreamModal{{ stream.id }}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteStreamModal{{ stream.id }}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-3">No streams defined</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- SUBJECTS SECTION -->
+<!-- ============================================ -->
+<div class="card-custom mb-4">
+    <div class="card-header">
+        <i class="fas fa-book-open me-2"></i>Subjects / Learning Areas
+        <button class="btn btn-sm btn-info float-end" data-bs-toggle="modal" data-bs-target="#addSubjectModal">
+            <i class="fas fa-plus"></i> Add Subject
+        </button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-custom table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Short Name</th>
+                        <th>Curriculum</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for subject in subjects %}
+                    <tr>
+                        <td><span class="badge bg-dark">{{ subject.code }}</span></td>
+                        <td><strong>{{ subject.name }}</strong></td>
+                        <td>{{ subject.short_name }}</td>
+                        <td>{{ subject.curriculum.name }}</td>
+                        <td>{{ subject.get_subject_type_display }}</td>
+                        <td>
+                            {% if subject.is_active %}
+                                <span class="badge-status bg-success text-white">Active</span>
+                            {% else %}
+                                <span class="badge-status bg-secondary text-white">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editSubjectModal{{ subject.id }}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteSubjectModal{{ subject.id }}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-3">No subjects defined</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- MODALS - Add / Edit / Delete -->
+<!-- ============================================ -->
+
+<!-- Add Academic Year Modal -->
+<div class="modal fade" id="addYearModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fas fa-calendar-plus"></i> Add Academic Year</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:academic_year_create' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Year <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" name="year" value="{% now 'Y' %}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" placeholder="e.g., Academic Year 2026" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" name="start_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">End Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" name="end_date" required>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="is_current" id="year_current">
+                        <label class="form-check-label" for="year_current">Set as Current Academic Year</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Year</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Grade Modal -->
+<div class="modal fade" id="addGradeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-layer-group"></i> Add Grade Level</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:grade_level_create' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Curriculum <span class="text-danger">*</span></label>
+                        <select class="form-select" name="curriculum" required>
+                            <option value="">Select Curriculum</option>
+                            {% for curr in curriculums %}
+                                <option value="{{ curr.id }}">{{ curr.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Type <span class="text-danger">*</span></label>
+                        <select class="form-select" name="level_type" required>
+                            <option value="FORM">Form (8-4-4)</option>
+                            <option value="GRADE">Grade (CBC)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Level Number <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" name="level_number" placeholder="e.g., 1, 2, 3" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" placeholder="e.g., Form 1, Grade 7" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Order</label>
+                        <input type="number" class="form-control" name="order" value="0">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Create Grade</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Stream Modal -->
+<div class="modal fade" id="addStreamModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="fas fa-users"></i> Add Stream</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:stream_create' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Grade Level <span class="text-danger">*</span></label>
+                        <select class="form-select" name="grade_level" required>
+                            <option value="">Select Grade</option>
+                            {% for grade in grade_levels %}
+                                <option value="{{ grade.id }}">{{ grade.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" placeholder="e.g., East, West, North" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Code <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="code" placeholder="e.g., 1E, 2W" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Capacity</label>
+                        <input type="number" class="form-control" name="capacity" value="40">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Create Stream</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Subject Modal -->
+<div class="modal fade" id="addSubjectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title"><i class="fas fa-book-open"></i> Add Subject</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:subject_create' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Curriculum <span class="text-danger">*</span></label>
+                        <select class="form-select" name="curriculum" required>
+                            <option value="">Select Curriculum</option>
+                            {% for curr in curriculums %}
+                                <option value="{{ curr.id }}">{{ curr.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Code <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="code" placeholder="e.g., MATH, ENG" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" placeholder="e.g., Mathematics" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Short Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="short_name" placeholder="e.g., Math" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Subject Type</label>
+                        <select class="form-select" name="subject_type">
+                            <option value="CORE">Core Subject</option>
+                            <option value="ELECTIVE">Elective</option>
+                            <option value="EXTRA">Extra-curricular</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-info">Create Subject</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit and Delete Modals for each item -->
+{% for year in academic_years %}
+<!-- Edit Year Modal -->
+<div class="modal fade" id="editYearModal{{ year.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="fas fa-edit"></i> Edit Academic Year</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:academic_year_edit' year.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Year</label>
+                        <input type="number" class="form-control" name="year" value="{{ year.year }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-control" name="name" value="{{ year.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Start Date</label>
+                        <input type="date" class="form-control" name="start_date" value="{{ year.start_date|date:'Y-m-d' }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">End Date</label>
+                        <input type="date" class="form-control" name="end_date" value="{{ year.end_date|date:'Y-m-d' }}" required>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="is_current" {% if year.is_current %}checked{% endif %}>
+                        <label class="form-check-label">Set as Current Academic Year</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Year Modal -->
+<div class="modal fade" id="deleteYearModal{{ year.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-trash"></i> Delete Academic Year</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:academic_year_delete' year.id %}">
+                {% csrf_token %}
+                <div class="modal-body text-center">
+                    <i class="fas fa-exclamation-triangle text-danger" style="font-size: 48px;"></i>
+                    <p class="mt-3">Are you sure you want to delete <strong>{{ year.year }} - {{ year.name }}</strong>?</p>
+                    <p class="text-muted small">This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Grade Edit/Delete Modals -->
+{% for grade in grade_levels %}
+<div class="modal fade" id="editGradeModal{{ grade.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="fas fa-edit"></i> Edit Grade Level</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:grade_level_edit' grade.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Curriculum</label>
+                        <select class="form-select" name="curriculum">
+                            {% for curr in curriculums %}
+                                <option value="{{ curr.id }}" {% if grade.curriculum.id == curr.id %}selected{% endif %}>{{ curr.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Type</label>
+                        <select class="form-select" name="level_type">
+                            <option value="FORM" {% if grade.level_type == 'FORM' %}selected{% endif %}>Form</option>
+                            <option value="GRADE" {% if grade.level_type == 'GRADE' %}selected{% endif %}>Grade</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Level Number</label>
+                        <input type="number" class="form-control" name="level_number" value="{{ grade.level_number }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-control" name="name" value="{{ grade.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Order</label>
+                        <input type="number" class="form-control" name="order" value="{{ grade.order }}">
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="is_active" {% if grade.is_active %}checked{% endif %}>
+                        <label class="form-check-label">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteGradeModal{{ grade.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-trash"></i> Delete Grade Level</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:grade_level_delete' grade.id %}">
+                {% csrf_token %}
+                <div class="modal-body text-center">
+                    <i class="fas fa-exclamation-triangle text-danger" style="font-size: 48px;"></i>
+                    <p class="mt-3">Delete <strong>{{ grade.name }}</strong>?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Stream Edit/Delete Modals -->
+{% for stream in streams %}
+<div class="modal fade" id="editStreamModal{{ stream.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="fas fa-edit"></i> Edit Stream</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:stream_edit' stream.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Grade Level</label>
+                        <select class="form-select" name="grade_level">
+                            {% for grade in grade_levels %}
+                                <option value="{{ grade.id }}" {% if stream.grade_level.id == grade.id %}selected{% endif %}>{{ grade.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-control" name="name" value="{{ stream.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Code</label>
+                        <input type="text" class="form-control" name="code" value="{{ stream.code }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Capacity</label>
+                        <input type="number" class="form-control" name="capacity" value="{{ stream.capacity }}">
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="is_active" {% if stream.is_active %}checked{% endif %}>
+                        <label class="form-check-label">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteStreamModal{{ stream.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-trash"></i> Delete Stream</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:stream_delete' stream.id %}">
+                {% csrf_token %}
+                <div class="modal-body text-center">
+                    <i class="fas fa-exclamation-triangle text-danger" style="font-size: 48px;"></i>
+                    <p class="mt-3">Delete <strong>{{ stream.name }}</strong>?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<!-- Subject Edit/Delete Modals -->
+{% for subject in subjects %}
+<div class="modal fade" id="editSubjectModal{{ subject.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="fas fa-edit"></i> Edit Subject</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:subject_edit' subject.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Curriculum</label>
+                        <select class="form-select" name="curriculum">
+                            {% for curr in curriculums %}
+                                <option value="{{ curr.id }}" {% if subject.curriculum.id == curr.id %}selected{% endif %}>{{ curr.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Code</label>
+                        <input type="text" class="form-control" name="code" value="{{ subject.code }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-control" name="name" value="{{ subject.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Short Name</label>
+                        <input type="text" class="form-control" name="short_name" value="{{ subject.short_name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Subject Type</label>
+                        <select class="form-select" name="subject_type">
+                            <option value="CORE" {% if subject.subject_type == 'CORE' %}selected{% endif %}>Core</option>
+                            <option value="ELECTIVE" {% if subject.subject_type == 'ELECTIVE' %}selected{% endif %}>Elective</option>
+                            <option value="EXTRA" {% if subject.subject_type == 'EXTRA' %}selected{% endif %}>Extra-curricular</option>
+                        </select>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="is_active" {% if subject.is_active %}checked{% endif %}>
+                        <label class="form-check-label">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="deleteSubjectModal{{ subject.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-trash"></i> Delete Subject</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:subject_delete' subject.id %}">
+                {% csrf_token %}
+                <div class="modal-body text-center">
+                    <i class="fas fa-exclamation-triangle text-danger" style="font-size: 48px;"></i>
+                    <p class="mt-3">Delete <strong>{{ subject.name }}</strong>?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{% endblock %}

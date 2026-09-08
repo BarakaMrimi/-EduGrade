@@ -1,0 +1,173 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Teacher Requests - EduGrade{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-clipboard-list"></i> Teacher Requests</h2>
+        {% if not is_admin %}
+        <a href="{% url 'teachers:request_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> New Request
+        </a>
+        {% endif %}
+    </div>
+    
+    <!-- Filters -->
+    <div class="card shadow mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-10">
+                    <select class="form-select" name="status">
+                        <option value="">All Status</option>
+                        {% for status_code, status_name in status_choices %}
+                            <option value="{{ status_code }}">{{ status_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-search"></i> Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Requests List -->
+    <div class="card shadow">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Teacher</th>
+                            <th>Request Type</th>
+                            <th>Subject</th>
+                            <th>Grade</th>
+                            <th>Stream</th>
+                            <th>Academic Year</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in requests %}
+                        <tr>
+                            <td>
+                                <strong>{{ req.teacher.full_name }}</strong><br>
+                                <small class="text-muted">{{ req.teacher.staff_number }}</small>
+                            </td>
+                            <td>
+                                <span class="badge bg-info">
+                                    {{ req.get_request_type_display }}
+                                </span>
+                            </td>
+                            <td>{{ req.subject.name|default:"-" }}</td>
+                            <td>{{ req.grade_level.name|default:"-" }}</td>
+                            <td>{{ req.stream.name|default:"-" }}</td>
+                            <td>{{ req.academic_year.year }}</td>
+                            <td>
+                                <span class="badge bg-{% if req.status == 'PENDING' %}warning{% elif req.status == 'APPROVED' %}success{% else %}danger{% endif %}">
+                                    {{ req.get_status_display }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if req.status == 'PENDING' and is_admin %}
+                                <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#approveModal{{ req.id }}">
+                                    <i class="fas fa-check"></i> Approve
+                                </button>
+                                <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ req.id }}">
+                                    <i class="fas fa-times"></i> Reject
+                                </button>
+                                {% elif req.status == 'PENDING' %}
+                                <span class="text-muted">Awaiting review</span>
+                                {% elif req.status == 'APPROVED' %}
+                                <span class="text-success"><i class="fas fa-check-circle"></i> Approved</span>
+                                {% else %}
+                                <span class="text-danger"><i class="fas fa-times-circle"></i> Rejected</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        
+                        <!-- Approve Modal -->
+                        {% if req.status == 'PENDING' and is_admin %}
+                        <div class="modal fade" id="approveModal{{ req.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-success text-white">
+                                        <h5 class="modal-title">Approve Request</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <form method="post">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="request_id" value="{{ req.id }}">
+                                        <input type="hidden" name="action" value="approve">
+                                        <div class="modal-body">
+                                            <p>Approve request from <strong>{{ req.teacher.full_name }}</strong></p>
+                                            <div class="mb-3">
+                                                <label class="form-label">Request Details:</label>
+                                                <ul>
+                                                    <li><strong>Type:</strong> {{ req.get_request_type_display }}</li>
+                                                    <li><strong>Subject:</strong> {{ req.subject.name|default:"-" }}</li>
+                                                    <li><strong>Grade:</strong> {{ req.grade_level.name|default:"-" }}</li>
+                                                    <li><strong>Stream:</strong> {{ req.stream.name|default:"-" }}</li>
+                                                </ul>
+                                                <p><strong>Reason:</strong> {{ req.reason }}</p>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="admin_notes" class="form-label">Admin Notes</label>
+                                                <textarea class="form-control" id="admin_notes" name="admin_notes" rows="2"></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="submit" class="btn btn-success">Approve</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Reject Modal -->
+                        <div class="modal fade" id="rejectModal{{ req.id }}" tabindex="-1">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header bg-danger text-white">
+                                        <h5 class="modal-title">Reject Request</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <form method="post">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="request_id" value="{{ req.id }}">
+                                        <input type="hidden" name="action" value="reject">
+                                        <div class="modal-body">
+                                            <p>Reject request from <strong>{{ req.teacher.full_name }}</strong></p>
+                                            <div class="mb-3">
+                                                <label for="admin_notes" class="form-label">Reason for Rejection</label>
+                                                <textarea class="form-control" id="admin_notes" name="admin_notes" rows="2" required></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                            <button type="submit" class="btn btn-danger">Reject</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted">No requests found</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

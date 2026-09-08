@@ -1,0 +1,98 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}View Marks - EduGrade{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-eye"></i> Mark View</h2>
+        <a href="{% url 'marks:entry' %}" class="btn btn-primary">
+            <i class="fas fa-arrow-left"></i> Back to Entry
+        </a>
+    </div>
+    
+    <div class="card shadow">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-file-alt"></i> 
+                {{ exam.name }} - {{ grade_level.name }} {{ stream.name }}
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Admission No.</th>
+                            <th>Student Name</th>
+                            {% for subject in subjects %}
+                                <th>{{ subject.short_name }}</th>
+                            {% endfor %}
+                            <th>Total</th>
+                            <th>Average</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for student_id, data in mark_matrix.items %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td><strong>{{ data.student.admission_number }}</strong></td>
+                            <td>{{ data.student.full_name }}</td>
+                            {% for subject in subjects %}
+                                <td>
+                                    {% with mark=data.marks|get_item:subject.id %}
+                                        {% if mark %}
+                                            <span class="badge bg-{% if mark >= 80 %}success{% elif mark >= 60 %}info{% elif mark >= 40 %}warning{% else %}danger{% endif %}">
+                                                {{ mark }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">-</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                            {% endfor %}
+                            <td>
+                                {% with total=0 %}
+                                    {% for subject in subjects %}
+                                        {% with mark=data.marks|get_item:subject.id %}
+                                            {% if mark %}
+                                                {% with total=total|add:mark %}{% endwith %}
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% endfor %}
+                                    {{ total }}
+                                {% endwith %}
+                            </td>
+                            <td>
+                                {% with count=0 total=0 %}
+                                    {% for subject in subjects %}
+                                        {% with mark=data.marks|get_item:subject.id %}
+                                            {% if mark %}
+                                                {% with count=count|add:1 total=total|add:mark %}{% endwith %}
+                                            {% endif %}
+                                        {% endwith %}
+                                    {% endfor %}
+                                    {% if count > 0 %}
+                                        {{ total|floatformat:1 }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="{{ subjects|length|add:4 }}" class="text-center text-muted">
+                                No marks available for this examination.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

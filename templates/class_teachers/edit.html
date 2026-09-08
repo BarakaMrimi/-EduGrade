@@ -1,0 +1,83 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Edit Class Teacher - EduGrade{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0"><i class="fas fa-edit"></i> Edit Class Teacher</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="teacher" class="form-label">Teacher <span class="text-danger">*</span></label>
+                            <select class="form-select" id="teacher" name="teacher" required>
+                                <option value="">Select Teacher</option>
+                                {% for teacher in teachers %}
+                                    <option value="{{ teacher.id }}" {% if class_teacher.teacher.id == teacher.id %}selected{% endif %}>
+                                        {{ teacher.full_name }} ({{ teacher.staff_number }})
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="grade_level" class="form-label">Grade/Form <span class="text-danger">*</span></label>
+                            <select class="form-select" id="grade_level" name="grade_level" required>
+                                <option value="">Select Grade</option>
+                                {% for grade in grade_levels %}
+                                    <option value="{{ grade.id }}" {% if class_teacher.grade_level.id == grade.id %}selected{% endif %}>
+                                        {{ grade.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="stream" class="form-label">Stream <span class="text-danger">*</span></label>
+                            <select class="form-select" id="stream" name="stream" required>
+                                <option value="">Select Stream</option>
+                                {% for stream in streams %}
+                                    <option value="{{ stream.id }}" {% if class_teacher.stream.id == stream.id %}selected{% endif %}>
+                                        {{ stream.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="academic_year" class="form-label">Academic Year <span class="text-danger">*</span></label>
+                            <select class="form-select" id="academic_year" name="academic_year" required>
+                                <option value="">Select Academic Year</option>
+                                {% for year in academic_years %}
+                                    <option value="{{ year.id }}" {% if class_teacher.academic_year.id == year.id %}selected{% endif %}>
+                                        {{ year.year }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="is_active" name="is_active" {% if class_teacher.is_active %}checked{% endif %}>
+                            <label class="form-check-label" for="is_active">Active</label>
+                        </div>
+                        
+                        <div class="text-center mt-4">
+                            <button type="submit" class="btn btn-warning btn-lg">
+                                <i class="fas fa-save"></i> Update Class Teacher
+                            </button>
+                            <a href="{% url 'teachers:class_teacher_list' %}" class="btn btn-secondary btn-lg">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,160 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ student.full_name }} - Performance Report{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-user-graduate"></i> Student Performance Report</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Student Info -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h5>Student Information</h5>
+                            <p><strong>Name:</strong> {{ student.full_name }}</p>
+                            <p><strong>Admission No:</strong> {{ student.admission_number }}</p>
+                            <p><strong>Grade:</strong> {{ student.current_grade_level.name|default:"-" }}</p>
+                            <p><strong>Stream:</strong> {{ student.current_stream.name|default:"-" }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>Examination Information</h5>
+                            <p><strong>Exam:</strong> {{ examination.name }}</p>
+                            <p><strong>Academic Year:</strong> {{ examination.academic_year.year }}</p>
+                            <p><strong>Term:</strong> {{ examination.term.name }}</p>
+                            <p><strong>Overall Grade:</strong> 
+                                <span class="badge bg-{% if analysis.overall_grade == 'A' %}success{% elif analysis.overall_grade == 'B' %}info{% elif analysis.overall_grade == 'C' %}warning{% else %}danger{% endif %}">
+                                    {{ analysis.overall_grade }}
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <!-- Subject Performance -->
+                    <h5 class="border-bottom pb-2">Subject Performance</h5>
+                    <div class="table-responsive mb-4">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Subject</th>
+                                    <th>Score</th>
+                                    <th>Grade</th>
+                                    <th>Points</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for perf in subject_performances %}
+                                <tr>
+                                    <td>{{ perf.subject.name }}</td>
+                                    <td>{{ perf.score|floatformat:1 }}%</td>
+                                    <td><span class="badge bg-{% if perf.grade == 'A' %}success{% elif perf.grade == 'B' %}info{% elif perf.grade == 'C' %}warning{% else %}danger{% endif %}">
+                                        {{ perf.grade }}
+                                    </span></td>
+                                    <td>{{ perf.points|floatformat:1 }}</td>
+                                    <td>
+                                        {% if perf.is_strong %}
+                                            <span class="badge bg-success">Strength</span>
+                                        {% elif perf.is_weak %}
+                                            <span class="badge bg-danger">Needs Improvement</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Satisfactory</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                <tr class="table-primary">
+                                    <td><strong>Total</strong></td>
+                                    <td><strong>{{ analysis.total_score|floatformat:1 }}</strong></td>
+                                    <td colspan="3"></td>
+                                </tr>
+                                <tr class="table-success">
+                                    <td><strong>Average</strong></td>
+                                    <td><strong>{{ analysis.average_score|floatformat:1 }}%</strong></td>
+                                    <td><strong>{{ analysis.overall_grade }}</strong></td>
+                                    <td><strong>{{ analysis.overall_points|floatformat:1 }}</strong></td>
+                                    <td>
+                                        {% if analysis.position %}
+                                            <span class="badge bg-info">Position: {{ analysis.position }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Strengths -->
+                    {% if strengths %}
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card bg-success bg-opacity-10">
+                                <div class="card-body">
+                                    <h5 class="text-success"><i class="fas fa-star"></i> Strengths</h5>
+                                    <ul>
+                                        {% for strength in strengths %}
+                                        <li><strong>{{ strength.subject }}</strong> - {{ strength.score }}%</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Weaknesses -->
+                    {% if weaknesses %}
+                        <div class="col-md-6">
+                            <div class="card bg-danger bg-opacity-10">
+                                <div class="card-body">
+                                    <h5 class="text-danger"><i class="fas fa-exclamation-triangle"></i> Areas for Improvement</h5>
+                                    <ul>
+                                        {% for weakness in weaknesses %}
+                                        <li><strong>{{ weakness.subject }}</strong> - {{ weakness.score }}%</li>
+                                        {% endfor %}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <!-- Improvement Suggestions -->
+                    {% if improvement_areas %}
+                    <div class="card bg-warning bg-opacity-10">
+                        <div class="card-body">
+                            <h5 class="text-warning"><i class="fas fa-lightbulb"></i> Improvement Suggestions</h5>
+                            <ul>
+                                {% for suggestion in improvement_areas %}
+                                <li>{{ suggestion }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="text-center mt-4">
+                        <button onclick="window.print()" class="btn btn-primary">
+                            <i class="fas fa-print"></i> Print Report
+                        </button>
+                        <a href="{% url 'grading:class_report' %}?exam_id={{ examination.id }}" class="btn btn-secondary">
+                            <i class="fas fa-arrow-left"></i> Back to Class Report
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .bg-gold { background-color: #FFD700; color: #000; }
+    .bg-silver { background-color: #C0C0C0; color: #000; }
+    .bg-bronze { background-color: #CD7F32; color: #fff; }
+    .bg-opacity-10 { opacity: 0.9; }
+</style>
+{% endblock %}

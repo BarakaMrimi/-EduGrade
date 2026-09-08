@@ -1,0 +1,219 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}School Structure - EduGrade{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h2><i class="fas fa-school"></i> School Structure</h2>
+                    <p class="text-muted mb-0">View the academic structure used by students, teachers, and reports.</p>
+                </div>
+                {% if user.is_staff or user.is_superuser %}
+                <a class="btn btn-primary" href="{% url 'school:setup_dashboard' %}">
+                    <i class="fas fa-sliders"></i> Manage Structure
+                </a>
+                {% endif %}
+            </div>
+            
+            <!-- Academic Years -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-calendar"></i> Academic Years</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Year</th>
+                                    <th>Name</th>
+                                    <th>Current</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for year in academic_years %}
+                                <tr>
+                                    <td><strong>{{ year.year }}</strong></td>
+                                    <td>{{ year.name }}</td>
+                                    <td>
+                                        {% if year.is_current %}
+                                            <span class="badge bg-success">Current</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td><a class="btn btn-sm btn-outline-primary" href="{% url 'school:setup_dashboard' %}"><i class="fas fa-pen"></i> Manage</a></td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">No academic years found</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Curriculums -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-book"></i> Curriculums</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for curriculum in curriculums %}
+                        <div class="col-md-3 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">{{ curriculum.name }}</h5>
+                                    <p class="card-text"><code>{{ curriculum.code }}</code></p>
+                                    <span class="badge bg-{% if curriculum.is_active %}success{% else %}danger{% endif %}">
+                                        {% if curriculum.is_active %}Active{% else %}Inactive{% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="col-12">
+                            <p class="text-center text-muted">No curriculums found</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Grade Levels -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0"><i class="fas fa-layer-group"></i> Grade/Form Levels</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Curriculum</th>
+                                    <th>Type</th>
+                                    <th>Order</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for grade in grade_levels %}
+                                <tr>
+                                    <td><strong>{{ grade.name }}</strong></td>
+                                    <td>{{ grade.curriculum.name }}</td>
+                                    <td>{{ grade.get_level_type_display }}</td>
+                                    <td>{{ grade.order }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if grade.is_active %}success{% else %}danger{% endif %}">
+                                            {% if grade.is_active %}Active{% else %}Inactive{% endif %}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">No grade levels found</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Streams -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-users"></i> Streams/Classes</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Code</th>
+                                    <th>Grade Level</th>
+                                    <th>Capacity</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for stream in streams %}
+                                <tr>
+                                    <td>{{ stream.name }}</td>
+                                    <td><span class="badge bg-secondary">{{ stream.code }}</span></td>
+                                    <td>{{ stream.grade_level.name }}</td>
+                                    <td>{{ stream.capacity }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if stream.is_active %}success{% else %}danger{% endif %}">
+                                            {% if stream.is_active %}Active{% else %}Inactive{% endif %}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">No streams found</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Subjects -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-book-open"></i> Subjects/Learning Areas</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Code</th>
+                                    <th>Name</th>
+                                    <th>Short Name</th>
+                                    <th>Curriculum</th>
+                                    <th>Type</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for subject in subjects %}
+                                <tr>
+                                    <td><span class="badge bg-dark">{{ subject.code }}</span></td>
+                                    <td>{{ subject.name }}</td>
+                                    <td>{{ subject.short_name }}</td>
+                                    <td>{{ subject.curriculum.name }}</td>
+                                    <td>{{ subject.get_subject_type_display }}</td>
+                                    <td>
+                                        <span class="badge bg-{% if subject.is_active %}success{% else %}danger{% endif %}">
+                                            {% if subject.is_active %}Active{% else %}Inactive{% endif %}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">No subjects found</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

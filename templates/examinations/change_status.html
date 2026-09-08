@@ -1,0 +1,60 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Change Status - EduGrade{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-exchange-alt"></i> Change Examination Status</h4>
+                </div>
+                <div class="card-body">
+                    <p class="text-center">
+                        <strong>{{ exam.name }}</strong><br>
+                        Current Status: 
+                        <span class="badge bg-{% if exam.status == 'DRAFT' %}secondary{% elif exam.status == 'ACTIVE' %}success{% elif exam.status == 'LOCKED' %}warning{% elif exam.status == 'PUBLISHED' %}info{% else %}danger{% endif %}">
+                            {{ exam.get_status_display }}
+                        </span>
+                    </p>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="status" class="form-label">New Status <span class="text-danger">*</span></label>
+                            <select class="form-select" id="status" name="status" required>
+                                <option value="">Select Status</option>
+                                {% for code, name in status_choices %}
+                                    <option value="{{ code }}" {% if exam.status == code %}selected{% endif %}>
+                                        {{ name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            <ul class="mb-0">
+                                <li><strong>Draft:</strong> Examination is being prepared</li>
+                                <li><strong>Active:</strong> Marks can be entered</li>
+                                <li><strong>Locked:</strong> Marks cannot be changed</li>
+                                <li><strong>Published:</strong> Results are available</li>
+                                <li><strong>Archived:</strong> Examination is complete</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="text-center mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Update Status
+                            </button>
+                            <a href="{% url 'examinations:detail' exam.id %}" class="btn btn-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

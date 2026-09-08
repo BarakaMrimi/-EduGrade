@@ -1,0 +1,91 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}New Request - EduGrade{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-plus-circle"></i> Submit New Request</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        Submit a request for a new teaching assignment. An administrator will review and approve your request.
+                    </div>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="request_type" class="form-label">Request Type <span class="text-danger">*</span></label>
+                            <select class="form-select" id="request_type" name="request_type" required>
+                                <option value="">Select Request Type</option>
+                                {% for code, name in request_types %}
+                                    <option value="{{ code }}">{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="subject" class="form-label">Subject <span class="text-danger">*</span></label>
+                            <select class="form-select" id="subject" name="subject" required>
+                                <option value="">Select Subject</option>
+                                {% for subject in subjects %}
+                                    <option value="{{ subject.id }}">{{ subject.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="grade_level" class="form-label">Grade/Form <span class="text-danger">*</span></label>
+                            <select class="form-select" id="grade_level" name="grade_level" required>
+                                <option value="">Select Grade</option>
+                                {% for grade in grade_levels %}
+                                    <option value="{{ grade.id }}">{{ grade.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="stream" class="form-label">Stream <span class="text-danger">*</span></label>
+                            <select class="form-select" id="stream" name="stream" required>
+                                <option value="">Select Stream</option>
+                                {% for stream in streams %}
+                                    <option value="{{ stream.id }}">{{ stream.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="academic_year" class="form-label">Academic Year <span class="text-danger">*</span></label>
+                            <select class="form-select" id="academic_year" name="academic_year" required>
+                                <option value="">Select Academic Year</option>
+                                {% for year in academic_years %}
+                                    <option value="{{ year.id }}" {% if year.is_current %}selected{% endif %}>{{ year.year }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="reason" class="form-label">Reason <span class="text-danger">*</span></label>
+                            <textarea class="form-control" id="reason" name="reason" rows="3" required 
+                                      placeholder="Explain why you need this assignment..."></textarea>
+                        </div>
+                        
+                        <div class="text-center mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-paper-plane"></i> Submit Request
+                            </button>
+                            <a href="{% url 'teachers:requests' %}" class="btn btn-secondary btn-lg">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

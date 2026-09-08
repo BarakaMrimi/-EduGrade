@@ -1,0 +1,154 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Students - EduGrade{% endblock %}
+{% block page_title %}Students{% endblock %}
+{% block page_subtitle %}Manage all students in the school{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex gap-2">
+        <a href="{% url 'students:create' %}" class="btn btn-primary">
+            <i class="fas fa-user-plus"></i> Register Student
+        </a>
+        <button class="btn btn-outline-secondary" onclick="window.print()">
+            <i class="fas fa-print"></i>
+        </button>
+    </div>
+    <div>
+        <span class="badge bg-primary fs-6">{{ students.paginator.count|default:0 }} Total</span>
+        <span class="badge bg-success fs-6 ms-1">8-4-4: {{ students_844|default:0 }}</span>
+        <span class="badge bg-info fs-6 ms-1">CBC: {{ students_cbc|default:0 }}</span>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card-custom mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <div class="input-group">
+                    <span class="input-group-text bg-white"><i class="fas fa-search"></i></span>
+                    <input type="text" class="form-control" name="search" placeholder="Search by name or admission..." value="{{ search_query }}">
+                </div>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" name="grade_level">
+                    <option value="">All Grades</option>
+                    {% for grade in grade_levels %}
+                        <option value="{{ grade.id }}" {% if selected_grade_level == grade.id|stringformat:'s' %}selected{% endif %}>{{ grade.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" name="stream">
+                    <option value="">All Streams</option>
+                    {% for stream in streams %}
+                        <option value="{{ stream.id }}" {% if selected_stream == stream.id|stringformat:'s' %}selected{% endif %}>{{ stream.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <select class="form-select" name="status">
+                    <option value="">All Status</option>
+                    {% for status_code, status_name in status_choices %}
+                        <option value="{{ status_code }}" {% if selected_status == status_code %}selected{% endif %}>{{ status_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="fas fa-filter"></i> Filter
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Student Table -->
+<div class="card-custom">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-custom table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Admission</th>
+                        <th>Name</th>
+                        <th>Gender</th>
+                        <th>Grade</th>
+                        <th>Stream</th>
+                        <th>Status</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in students %}
+                    <tr>
+                        <td><strong>{{ student.admission_number }}</strong></td>
+                        <td>
+                            <a href="{% url 'students:detail' student.id %}" class="text-decoration-none text-dark fw-semibold">
+                                {{ student.full_name }}
+                            </a>
+                        </td>
+                        <td>
+                            {% if student.gender == 'M' %}
+                                <i class="fas fa-mars text-primary"></i> Male
+                            {% else %}
+                                <i class="fas fa-venus text-danger"></i> Female
+                            {% endif %}
+                        </td>
+                        <td>{{ student.current_grade_level.name|default:"-" }}</td>
+                        <td>{{ student.current_stream.name|default:"-" }}</td>
+                        <td>
+                            <span class="badge-status bg-{% if student.status == 'ACTIVE' %}success{% elif student.status == 'INACTIVE' %}secondary{% elif student.status == 'GRADUATED' %}info{% else %}warning{% endif %} text-white">
+                                {{ student.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{% url 'students:detail' student.id %}" class="btn btn-outline-info" title="View">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'students:edit' student.id %}" class="btn btn-outline-warning" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{% url 'students:delete' student.id %}" class="btn btn-outline-danger" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">
+                            <i class="fas fa-users fa-2x d-block mb-2"></i>
+                            No students found
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Pagination -->
+{% if students.has_other_pages %}
+<nav class="pagination-wrap mt-4" aria-label="Student pages">
+    <div class="pagination-summary">Showing {{ students.start_index }}-{{ students.end_index }} of {{ students.paginator.count }} students</div>
+    <ul class="pagination justify-content-center mb-0">
+        {% if students.has_previous %}
+            <li class="page-item"><a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ students.previous_page_number }}" aria-label="Previous page"><i class="fas fa-chevron-left"></i></a></li>
+        {% endif %}
+        {% for num in students.paginator.page_range %}
+            <li class="page-item {% if students.number == num %}active{% endif %}">
+                <a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ num }}">{{ num }}</a>
+            </li>
+        {% endfor %}
+        {% if students.has_next %}
+            <li class="page-item"><a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ students.next_page_number }}" aria-label="Next page"><i class="fas fa-chevron-right"></i></a></li>
+        {% endif %}
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

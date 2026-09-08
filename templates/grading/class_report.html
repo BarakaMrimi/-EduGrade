@@ -1,0 +1,175 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Class Report - EduGrade{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-chart-bar"></i> Class Performance Report</h2>
+        <div>
+            <a href="{% url 'grading:process' %}" class="btn btn-primary">
+                <i class="fas fa-arrow-left"></i> Back
+            </a>
+        </div>
+    </div>
+    
+    <!-- Overview Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-white bg-primary">
+                <div class="card-body">
+                    <h6 class="card-title">Total Students</h6>
+                    <h2 class="card-text">{{ total_students }}</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-success">
+                <div class="card-body">
+                    <h6 class="card-title">Average Score</h6>
+                    <h2 class="card-text">{{ avg_score|floatformat:1 }}%</h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-info">
+                <div class="card-body">
+                    <h6 class="card-title">Pass Rate</h6>
+                    <h2 class="card-text">{{ pass_rate|floatformat:1 }}%</h2>
+                    <small>{{ pass_count }}/{{ total_students }} students passed</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-white bg-warning">
+                <div class="card-body">
+                    <h6 class="card-title">Highest Score</h6>
+                    <h2 class="card-text">{{ highest_score|floatformat:1 }}%</h2>
+                    <small>Lowest: {{ lowest_score|floatformat:1 }}%</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Grade Distribution -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="fas fa-chart-pie"></i> Grade Distribution</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Grade</th>
+                                    <th>Count</th>
+                                    <th>Percentage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for grade, count in grade_distribution %}
+                                <tr>
+                                    <td><span class="badge bg-primary">{{ grade }}</span></td>
+                                    <td>{{ count }}</td>
+                                    <td>{{ count|floatformat:0 }}%</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center">No data available</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Subject Performance -->
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-book"></i> Subject Performance</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Subject</th>
+                                    <th>Average</th>
+                                    <th>Highest</th>
+                                    <th>Lowest</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for subject in subject_performances %}
+                                <tr>
+                                    <td>{{ subject.subject__name }}</td>
+                                    <td>{{ subject.avg_score|floatformat:1 }}%</td>
+                                    <td>{{ subject.max_score|floatformat:1 }}%</td>
+                                    <td>{{ subject.min_score|floatformat:1 }}%</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center">No data available</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Top Students -->
+    <div class="card shadow">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0"><i class="fas fa-trophy"></i> Top 10 Students</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Admission No.</th>
+                            <th>Student Name</th>
+                            <th>Average Score</th>
+                            <th>Grade</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for student in top_students %}
+                        <tr>
+                            <td><span class="badge bg-{% if forloop.counter == 1 %}gold{% elif forloop.counter == 2 %}silver{% elif forloop.counter == 3 %}bronze{% else %}secondary{% endif %}">
+                                {{ forloop.counter }}
+                            </span></td>
+                            <td>{{ student.student.admission_number }}</td>
+                            <td>{{ student.student.full_name }}</td>
+                            <td>{{ student.average_score|floatformat:1 }}%</td>
+                            <td><span class="badge bg-primary">{{ student.overall_grade }}</span></td>
+                            <td>
+                                <a href="{% url 'grading:student_report' student.student.id %}?exam_id={{ examination.id }}" 
+                                   class="btn btn-sm btn-info">
+                                    <i class="fas fa-eye"></i> Report
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center">No data available</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,46 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Remove Class Teacher - EduGrade{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Remove Class Teacher</h4>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-4">
+                        <i class="fas fa-user-times text-danger" style="font-size: 4rem;"></i>
+                    </div>
+                    <h4>Are you sure you want to remove this class teacher?</h4>
+                    <p class="text-muted">
+                        <strong>{{ class_teacher.teacher.full_name }}</strong><br>
+                        {{ class_teacher.grade_level.name }} - {{ class_teacher.stream.name }}<br>
+                        {{ class_teacher.academic_year.year }}
+                    </p>
+                    
+                    <div class="alert alert-warning">
+                        <i class="fas fa-info-circle"></i> 
+                        This action cannot be undone.
+                    </div>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-trash"></i> Confirm Remove
+                            </button>
+                            <a href="{% url 'teachers:class_teacher_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,14 @@
+﻿{% extends 'base.html' %}
+
+{% block content %}
+<div class="text-center mt-5">
+    <h1 class="display-4">EduGrade Analytics System</h1>
+    <p class="lead">School Performance Management Platform</p>
+    <hr class="my-4">
+    <p>Manage students, teachers, examinations, and generate reports.</p>
+    <div class="mt-4">
+        <a href="{% url 'authentication:login' %}" class="btn btn-primary btn-lg">Login</a>
+        <a href="{% url 'authentication:register' %}" class="btn btn-outline-secondary btn-lg">Register</a>
+    </div>
+</div>
+{% endblock %}

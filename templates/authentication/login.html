@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Login - EduGrade{% endblock %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-panel login-panel">
+        <div class="auth-copy">
+            <span class="eyebrow">Welcome back</span>
+            <h1>Sign in to EduGrade.</h1>
+            <p>Access school records, reports, marks, and academic performance tools.</p>
+        </div>
+
+        <div class="auth-card">
+            <div class="auth-brand"><i class="fas fa-graduation-cap"></i> EduGrade</div>
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} custom-alert">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+
+            <form method="post" class="auth-form">
+                {% csrf_token %}
+                <div class="form-field">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="Enter username" required>
+                </div>
+                <div class="form-field">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="Enter password" required>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Login</button>
+            </form>
+
+            <div class="auth-footer">
+                <span>Need an account?</span>
+                <a href="{% url 'authentication:register' %}">Create one</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}Class Report - EduGrade{% endblock %}
+{% block page_title %}Class Report{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <h2>Generate Class Report</h2>
+    <p class="text-muted">Select the examination, grade, and stream for the class analysis.</p>
+    <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="examination" class="form-label">Examination</label>
+            <select class="form-select" name="examination" required>
+                <option value="">Select Examination</option>
+                {% for exam in examinations %}<option value="{{ exam.id }}">{{ exam.name }} ({{ exam.academic_year.year }})</option>{% endfor %}
+            </select>
+        </div>
+        <div class="mb-3"><label for="grade_level" class="form-label">Grade/Form</label><select class="form-select" name="grade_level" id="grade_level" required><option value="">Select Grade</option>{% for grade in grade_levels %}<option value="{{ grade.id }}">{{ grade.name }}</option>{% endfor %}</select></div>
+        <div class="mb-3"><label for="stream" class="form-label">Stream</label><select class="form-select" name="stream" id="stream" required><option value="">Select Stream</option>{% for stream in streams %}<option value="{{ stream.id }}">{{ stream.grade_level.name }} - {{ stream.name }}</option>{% endfor %}</select></div>
+        <button type="submit" class="btn btn-primary">Generate</button>
+        <a href="{% url 'reports:dashboard' %}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

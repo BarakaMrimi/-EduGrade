@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block title %}Reports - EduGrade{% endblock %}
+{% block page_title %}Report Centre{% endblock %}
+{% block page_subtitle %}Generate, review, and track academic reports{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div><h2 class="mb-1">Report Centre</h2><p class="text-muted mb-0">Choose a report scope to get started.</p></div>
+        <a href="{% url 'reports:list' %}" class="btn btn-outline-primary"><i class="fas fa-list me-1"></i>All Reports</a>
+    </div>
+    <div class="row g-4 mb-4">
+        <div class="col-md-4"><div class="stat-card"><span class="stat-label">Total reports</span><div class="stat-number">{{ total_reports }}</div></div></div>
+        <div class="col-md-4"><div class="stat-card" style="border-left-color:#10b981"><span class="stat-label">Published</span><div class="stat-number">{{ published_reports }}</div></div></div>
+        <div class="col-md-4"><div class="stat-card" style="border-left-color:#f59e0b"><span class="stat-label">Recent class reports</span><div class="stat-number">{{ class_reports|length }}</div></div></div>
+    </div>
+    <div class="row g-4">
+        <div class="col-md-4"><a href="{% url 'students:list' %}" class="quick-action"><i class="fas fa-user-graduate text-primary"></i><span>Student Report</span><small class="text-muted">Select a student and examination</small></a></div>
+        <div class="col-md-4"><a href="{% url 'reports:class_report' %}" class="quick-action"><i class="fas fa-users text-success"></i><span>Class Report</span><small class="text-muted">Compare a grade and stream</small></a></div>
+        <div class="col-md-4"><a href="{% url 'reports:school_report' %}" class="quick-action"><i class="fas fa-school text-info"></i><span>School Report</span><small class="text-muted">Review school-wide distribution</small></a></div>
+    </div>
+</div>
+{% endblock %}

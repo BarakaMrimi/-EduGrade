@@ -1,0 +1,60 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Process Marks - EduGrade{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="fas fa-cogs"></i> Process Marks</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        This will process all marks for the selected examination and generate grades, totals, and performance analytics.
+                    </div>
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="examination" class="form-label">Examination <span class="text-danger">*</span></label>
+                            <select class="form-select" id="examination" name="examination" required>
+                                <option value="">Select Examination</option>
+                                {% for exam in examinations %}
+                                    <option value="{{ exam.id }}">{{ exam.name }} ({{ exam.academic_year.year }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="grade_level" class="form-label">Grade/Form <span class="text-danger">*</span></label>
+                            <select class="form-select" id="grade_level" name="grade_level" required>
+                                <option value="">Select Grade</option>
+                                {% for grade in grade_levels %}
+                                    <option value="{{ grade.id }}">{{ grade.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="stream" class="form-label">Stream <span class="text-danger">*</span></label>
+                            <select class="form-select" id="stream" name="stream" required>
+                                <option value="">Select Stream</option>
+                                {% for stream in streams %}
+                                    <option value="{{ stream.id }}">{{ stream.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="text-center mt-4">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="fas fa-play"></i> Process Marks
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

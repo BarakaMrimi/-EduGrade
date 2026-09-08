@@ -1,0 +1,74 @@
+﻿{% extends 'base.html' %}
+
+{% block title %}{{ teacher.full_name }} - Teacher Profile{% endblock %}
+{% block page_title %}Teacher Profile{% endblock %}
+{% block page_subtitle %}Review identity, role, subjects, and class responsibilities{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-start gap-3 mb-4">
+        <div>
+            <a href="{% url 'teachers:list' %}" class="btn btn-sm btn-outline-secondary mb-2"><i class="fas fa-arrow-left"></i> Back to Teachers</a>
+            <h2 class="mb-1">{{ teacher.full_name }}</h2>
+            <p class="text-muted mb-0">Staff number: {{ teacher.staff_number }} · {{ teacher.email }}</p>
+            <p class="text-muted mb-0">TSC number: {{ teacher.tsc_number|default:'Not provided' }}</p>
+        </div>
+        <div class="d-flex flex-wrap gap-2 justify-content-end">
+            <a href="{% url 'teachers:edit' teacher.id %}" class="btn btn-outline-warning"><i class="fas fa-edit"></i> Edit Profile</a>
+            <a href="{% url 'teachers:assign' teacher.id %}" class="btn btn-primary"><i class="fas fa-plus"></i> Change Subjects / Classes</a>
+            {% if is_admin %}
+                {% if teacher.is_active %}
+                <form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="suspend"><button class="btn btn-outline-danger" type="submit" onclick="return confirm('Suspend this teacher?')"><i class="fas fa-user-lock"></i> Suspend</button></form>
+                {% else %}
+                <form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="activate"><button class="btn btn-outline-success" type="submit"><i class="fas fa-user-check"></i> Reactivate</button></form>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-xl-3 col-md-6"><div class="stat-card"><span class="stat-label">Profile status</span><div class="stat-number fs-4">{{ teacher.get_status_display }}</div><small class="text-muted">{% if teacher.is_active %}Account active{% else %}Account disabled{% endif %}</small></div></div>
+        <div class="col-xl-3 col-md-6"><div class="stat-card" style="border-left-color:#10b981"><span class="stat-label">Subject assignments</span><div class="stat-number">{{ assignments|length }}</div><small class="text-muted">Approved teaching allocations</small></div></div>
+        <div class="col-xl-3 col-md-6"><div class="stat-card" style="border-left-color:#0ea5e9"><span class="stat-label">Class responsibilities</span><div class="stat-number">{{ class_teacher|length }}</div><small class="text-muted">Assigned streams/forms</small></div></div>
+        <div class="col-xl-3 col-md-6"><div class="stat-card" style="border-left-color:#f59e0b"><span class="stat-label">Requests</span><div class="stat-number">{{ requests|length }}</div><small class="text-muted">Assignment requests</small></div></div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card-custom mb-4"><div class="card-header"><i class="fas fa-id-card me-2"></i>Teacher Details</div><div class="card-body">
+                <p><strong>Full name</strong><br>{{ teacher.full_name }}</p>
+                <p><strong>Gender</strong><br>{{ teacher.get_gender_display }}</p>
+                <p><strong>Phone</strong><br>{{ teacher.phone_number }}</p>
+                <p><strong>Role</strong><br>{{ teacher.user.profile.role.get_name_display|default:'No role assigned' }}</p>
+                <p><strong>Qualification</strong><br>{{ teacher.qualification }}</p>
+                <p><strong>Specialization</strong><br>{{ teacher.specialization|default:'Not specified' }}</p>
+                <p class="mb-0"><strong>Employment date</strong><br>{{ teacher.employment_date|date:'d M Y' }}</p>
+            </div></div>
+
+            {% if is_admin %}
+            <div class="card-custom border-danger"><div class="card-header text-danger"><i class="fas fa-shield-halved me-2"></i>Administrative Actions</div><div class="card-body">
+                <form method="post" class="mb-3">{% csrf_token %}<input type="hidden" name="action" value="update_role"><label class="form-label">Change role</label><div class="input-group mb-2"><select name="role_id" class="form-select" required>{% for role in roles %}<option value="{{ role.id }}" {% if teacher.user.profile.role_id == role.id %}selected{% endif %}>{{ role.get_name_display }}</option>{% endfor %}</select><button class="btn btn-outline-primary" type="submit">Save</button></div></form>
+                <form method="post" class="mb-3">{% csrf_token %}<input type="hidden" name="action" value="warn"><label class="form-label">Record a warning</label><input name="warning_reason" class="form-control mb-2" placeholder="Reason for warning" required><button class="btn btn-outline-warning w-100" type="submit"><i class="fas fa-triangle-exclamation"></i> Record Warning</button></form>
+                <form method="post">{% csrf_token %}<input type="hidden" name="action" value="delete"><button class="btn btn-outline-danger w-100" type="submit" onclick="return confirm('Delete this teacher and their account permanently?')"><i class="fas fa-trash"></i> Delete Teacher</button></form>
+            </div></div>
+            {% endif %}
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card-custom mb-4"><div class="card-header d-flex justify-content-between align-items-center"><span><i class="fas fa-chalkboard-user me-2"></i>Subjects and Classes Taught</span><a href="{% url 'teachers:assign' teacher.id %}" class="btn btn-sm btn-primary"><i class="fas fa-plus"></i> Add Assignment</a></div><div class="card-body p-0"><div class="table-responsive"><table class="table table-custom table-hover mb-0"><thead><tr><th>Subject</th><th>Grade/Form</th><th>Stream</th><th>Academic Year</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>{% for assignment in assignments %}<tr><td><strong>{{ assignment.subject.name }}</strong><small class="text-muted d-block">{{ assignment.curriculum.name }}</small></td><td>{{ assignment.grade_level.name }}</td><td>{{ assignment.stream.name }}</td><td>{{ assignment.academic_year.year }}</td><td>{% if assignment.is_class_teacher %}<span class="badge bg-info">Class Teacher</span>{% else %}<span class="badge bg-light text-dark">Subject Teacher</span>{% endif %}</td><td><span class="badge bg-success">{{ assignment.get_status_display }}</span></td><td>{% if is_admin %}<form method="post" action="{% url 'teachers:assignment_delete' assignment.id %}">{% csrf_token %}<button class="btn btn-sm btn-outline-danger" title="Remove assignment" onclick="return confirm('Remove this assignment?')"><i class="fas fa-trash"></i></button></form>{% endif %}</td></tr>{% empty %}<tr><td colspan="7" class="text-center text-muted py-4">No subject or class assignments yet.</td></tr>{% endfor %}</tbody></table></div></div></div>
+
+            <div class="card-custom mb-4"><div class="card-header"><i class="fas fa-users-gear me-2"></i>Class Teacher Responsibilities</div><div class="card-body p-0"><div class="table-responsive"><table class="table table-custom mb-0"><thead><tr><th>Grade/Form</th><th>Stream</th><th>Academic Year</th><th>Status</th></tr></thead><tbody>{% for item in class_teacher %}<tr><td>{{ item.grade_level.name }}</td><td>{{ item.stream.name }}</td><td>{{ item.academic_year.year }}</td><td><span class="badge bg-success">Active</span></td></tr>{% empty %}<tr><td colspan="4" class="text-center text-muted py-4">No class-teacher role assigned.</td></tr>{% endfor %}</tbody></table></div></div></div>
+
+            <div class="card-custom"><div class="card-header"><i class="fas fa-clipboard-list me-2"></i>Recent Assignment Requests</div><div class="card-body p-0"><div class="table-responsive"><table class="table table-custom mb-0"><thead><tr><th>Type</th><th>Subject</th><th>Class</th><th>Status</th><th>Date</th></tr></thead><tbody>{% for item in requests|slice:':10' %}<tr><td>{{ item.get_request_type_display }}</td><td>{{ item.subject.name|default:'-' }}</td><td>{{ item.grade_level.name|default:'-' }} {{ item.stream.name|default:'' }}</td><td>{{ item.get_status_display }}</td><td>{{ item.requested_date|date:'d M Y' }}</td></tr>{% empty %}<tr><td colspan="5" class="text-center text-muted py-4">No assignment requests.</td></tr>{% endfor %}</tbody></table></div></div></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+
+
+
+
+
+

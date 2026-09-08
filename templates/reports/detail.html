@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block title %}Report Details - EduGrade{% endblock %}
+{% block page_title %}Report Details{% endblock %}
+{% block content %}
+<div class="container-fluid"><div class="d-flex justify-content-between align-items-center mb-4"><div><h2>{{ report.title }}</h2><p class="text-muted mb-0">{{ report.get_report_type_display }} · {{ report.generated_at|date:'d M Y H:i' }}</p></div><a href="{% url 'reports:list' %}" class="btn btn-outline-secondary">Back</a></div><div class="card-custom"><div class="card-body"><div class="row g-3"><div class="col-md-4"><strong>Status</strong><br>{{ report.get_status_display }}</div><div class="col-md-4"><strong>Student</strong><br>{{ report.student.full_name|default:'-' }}</div><div class="col-md-4"><strong>Examination</strong><br>{{ report.examination.name|default:'-' }}</div></div></div></div></div>
+{% endblock %}

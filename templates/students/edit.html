@@ -1,0 +1,206 @@
+﻿{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Edit Student - EduGrade{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0"><i class="fas fa-edit"></i> Edit Student: {{ student.full_name }}</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5 class="border-bottom pb-2">Personal Information</h5>
+                                <div class="mb-3">
+                                    <label for="admission_number" class="form-label">Admission Number <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="admission_number" name="admission_number" value="{{ student.admission_number }}" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="first_name" class="form-label">First Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="first_name" name="first_name" value="{{ student.first_name }}" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="middle_name" class="form-label">Middle Name</label>
+                                    <input type="text" class="form-control" id="middle_name" name="middle_name" value="{{ student.middle_name|default:'' }}">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="last_name" class="form-label">Last Name <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" id="last_name" name="last_name" value="{{ student.last_name }}" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="date_of_birth" class="form-label">Date of Birth <span class="text-danger">*</span></label>
+                                    <input type="date" class="form-control" id="date_of_birth" name="date_of_birth" value="{{ student.date_of_birth|date:'Y-m-d' }}" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="gender" class="form-label">Gender <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="gender" name="gender" required>
+                                        <option value="">Select Gender</option>
+                                        {% for code, name in gender_choices %}
+                                            <option value="{{ code }}" {% if student.gender == code %}selected{% endif %}>{{ name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="nationality" class="form-label">Nationality</label>
+                                    <input type="text" class="form-control" id="nationality" name="nationality" value="{{ student.nationality }}">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="religion" class="form-label">Religion</label>
+                                    <input type="text" class="form-control" id="religion" name="religion" value="{{ student.religion|default:'' }}">
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <h5 class="border-bottom pb-2">Contact Information</h5>
+                                <div class="mb-3">
+                                    <label for="email" class="form-label">Email</label>
+                                    <input type="email" class="form-control" id="email" name="email" value="{{ student.email|default:'' }}">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="phone_number" class="form-label">Phone Number</label>
+                                    <input type="text" class="form-control" id="phone_number" name="phone_number" value="{{ student.phone_number|default:'' }}">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="address" class="form-label">Address</label>
+                                    <textarea class="form-control" id="address" name="address" rows="2">{{ student.address|default:'' }}</textarea>
+                                </div>
+                                
+                                <h5 class="border-bottom pb-2 mt-4">Academic Information</h5>
+                                <div class="mb-3">
+                                    <label for="admission_date" class="form-label">Admission Date <span class="text-danger">*</span></label>
+                                    <input type="date" class="form-control" id="admission_date" name="admission_date" value="{{ student.admission_date|date:'Y-m-d' }}" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="curriculum" class="form-label">Curriculum <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="curriculum" name="curriculum" required>
+                                        <option value="">Select Curriculum</option>
+                                        {% for curriculum in curriculums %}
+                                            <option value="{{ curriculum.id }}" {% if student.curriculum_id == curriculum.id %}selected{% endif %}>{{ curriculum.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="grade_level" class="form-label">Grade/Form <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="grade_level" name="grade_level" required>
+                                        <option value="">Select Grade</option>
+                                        {% for grade in grade_levels %}
+                                            <option value="{{ grade.id }}" {% if student.current_grade_level_id == grade.id %}selected{% endif %}>{{ grade.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="stream" class="form-label">Stream <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="stream" name="stream" required>
+                                        <option value="">Select Stream</option>
+                                        {% for stream in streams %}
+                                            <option value="{{ stream.id }}" {% if student.current_stream_id == stream.id %}selected{% endif %}>{{ stream.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="academic_year" class="form-label">Academic Year <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="academic_year" name="academic_year" required>
+                                        <option value="">Select Academic Year</option>
+                                        {% for year in academic_years %}
+                                            <option value="{{ year.id }}" {% if student.academic_year_id == year.id %}selected{% endif %}>{{ year.year }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                
+                                <h5 class="border-bottom pb-2 mt-4">Guardian Information</h5>
+                                <div class="mb-3">
+                                    <label for="guardian_name" class="form-label">Guardian Name</label>
+                                    <input type="text" class="form-control" id="guardian_name" name="guardian_name" value="{{ student.guardian_name|default:'' }}">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="guardian_phone" class="form-label">Guardian Phone</label>
+                                    <input type="text" class="form-control" id="guardian_phone" name="guardian_phone" value="{{ student.guardian_phone|default:'' }}">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="guardian_email" class="form-label">Guardian Email</label>
+                                    <input type="email" class="form-control" id="guardian_email" name="guardian_email" value="{{ student.guardian_email|default:'' }}">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="guardian_relationship" class="form-label">Relationship</label>
+                                    <input type="text" class="form-control" id="guardian_relationship" name="guardian_relationship" value="{{ student.guardian_relationship|default:'' }}">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="status" class="form-label">Status</label>
+                                    <select class="form-select" id="status" name="status">
+                                        {% for code, name in status_choices %}
+                                            <option value="{{ code }}" {% if student.status == code %}selected{% endif %}>{{ name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="text-center mt-4">
+                            <button type="submit" class="btn btn-warning btn-lg">
+                                <i class="fas fa-save"></i> Update Student
+                            </button>
+                            <a href="{% url 'students:detail' student.id %}" class="btn btn-secondary btn-lg">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const gradeSelect = document.getElementById('grade_level');
+        const streamSelect = document.getElementById('stream');
+
+        if (!gradeSelect || !streamSelect) return;
+
+        const loadStreams = function (gradeId, selectedStreamId = null) {
+            streamSelect.innerHTML = '<option value="">Select Stream</option>';
+            if (!gradeId) return;
+
+            fetch('/school/api/streams/?grade_level_id=' + encodeURIComponent(gradeId))
+                .then(function (response) {
+                    return response.json();
+                })
+                .then(function (data) {
+                    const streams = data.streams || [];
+                    if (!streams.length) {
+                        streamSelect.innerHTML = '<option value="">No streams available for this grade</option>';
+                        return;
+                    }
+
+                    streams.forEach(function (stream) {
+                        const option = new Option(stream.name, stream.id);
+                        if (selectedStreamId && String(stream.id) === String(selectedStreamId)) {
+                            option.selected = true;
+                        }
+                        streamSelect.add(option);
+                    });
+                })
+                .catch(function () {
+                    streamSelect.innerHTML = '<option value="">Unable to load streams</option>';
+                });
+        };
+
+        const selectedStreamId = '{{ student.current_stream_id|default:"" }}';
+        const initialGradeId = gradeSelect.value;
+        if (initialGradeId) {
+            loadStreams(initialGradeId, selectedStreamId);
+        }
+
+        gradeSelect.addEventListener('change', function () {
+            loadStreams(this.value);
+        });
+    });
+</script>
+{% endblock %}
