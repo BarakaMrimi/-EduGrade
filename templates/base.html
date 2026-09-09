@@ -28,6 +28,9 @@
             <a href="{% url 'examinations:list' %}" class="{% if request.resolver_match.app_name == 'examinations' %}active{% endif %}"><i class="fas fa-file-alt"></i> Examinations</a>
             <div class="menu-label">Academics</div>
             <a href="{% url 'marks:entry' %}"><i class="fas fa-edit"></i> Mark Entry</a>
+            {% if user.is_staff or user.is_superuser %}
+            <a href="{% url 'marks:admin_mark_management' %}"><i class="fas fa-search-dollar"></i> Admin Mark Management</a>
+            {% endif %}
             <a href="{% url 'grading:process' %}"><i class="fas fa-cogs"></i> Grading Engine</a>
             <div class="menu-label">Reports</div>
             <a href="{% url 'reports:dashboard' %}" class="{% if request.resolver_match.app_name == 'reports' %}active{% endif %}"><i class="fas fa-file-pdf"></i> Reports</a>

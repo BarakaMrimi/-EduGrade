@@ -20,10 +20,16 @@ Database helpers (create / seed data)
     create_kcse_assessment_scheme    full 8-4-4 grading scheme
     create_cbc_assessment_scheme     full CBC grading scheme
     seed_student_assessments         generate MarkEntry /
-                                      StudentKCSEGrade /
-                                      StudentOverallKCSE records
+                                       StudentKCSEGrade /
+                                       StudentOverallKCSE records
     seed_cbc_assessments             generate StudentCBAAssessment /
-                                      StudentOverallCBA records
+                                       StudentOverallCBA records
+
+Mark-edit helpers
+    recalculate_student_kcse_grade   update a single KCSE grade row
+    recalculate_student_cba_grade    update a single CBC assessment row
+    recalculate_overall_for_student  update StudentOverallKCSE/CBA
+    recalculate_for_mark_change      full pipeline when a MarkEntry changes
 """
 
 from decimal import Decimal
@@ -731,3 +737,214 @@ def get_scheme_for_curriculum(curriculum_code):
     """Return the active AssessmentScheme for a curriculum code."""
     from .models import AssessmentScheme
     return AssessmentScheme.objects.filter(curriculum=curriculum_code, is_active=True).first()
+
+
+# ---------------------------------------------------------------------------
+# Mark-change pipeline — recalculate grades when a MarkEntry is edited
+# ---------------------------------------------------------------------------
+
+def recalculate_student_kcse_grade(mark_entry):
+    """Recalculate a single ``StudentKCSEGrade`` row from a ``MarkEntry``.
+
+    Looks up the active KCSE rules for the examination's curriculum and
+    updates ``raw_mark``, ``grade``, ``points`` and ``is_core``.
+    Returns the updated ``StudentKCSEGrade`` or ``None`` if no row exists.
+    """
+    from .models import StudentKCSEGrade, AssessmentScheme, KCSEGradeRule, KCSEOverallCalculation
+
+    exam = mark_entry.examination
+    if exam.curriculum.code != "844":
+        return None
+
+    scheme = get_scheme_for_curriculum("844")
+    if not scheme:
+        return None
+
+    rules = KCSEGradeRule.objects.filter(scheme=scheme, is_active=True).order_by("order")
+    rule = _match_kcse_grade(rules, float(mark_entry.score or 0))
+
+    calculation = KCSEOverallCalculation.objects.filter(scheme=scheme, is_active=True).first()
+    is_core = calculation and calculation.core_subjects.filter(id=mark_entry.subject.id).exists() if calculation else False
+
+    grade_obj, _ = StudentKCSEGrade.objects.update_or_create(
+        student=mark_entry.student,
+        examination=exam,
+        subject=mark_entry.subject,
+        defaults={
+            "raw_mark": mark_entry.score,
+            "grade": rule["grade"],
+            "points": Decimal(rule["points"]),
+            "is_core": is_core,
+        },
+    )
+    return grade_obj
+
+
+def recalculate_student_cba_grade(mark_entry):
+    """Recalculate a single ``StudentCBAAssessment`` row from a ``MarkEntry``.
+
+    For CBC, the mark score maps to a performance level using
+    ``get_performance_level``.
+    """
+    from .models import StudentCBAAssessment, AssessmentScheme, PerformanceLevel
+
+    exam = mark_entry.examination
+    if exam.curriculum.code != "CBC":
+        return None
+
+    scheme = get_scheme_for_curriculum("CBC")
+    if not scheme:
+        return None
+
+    levels = {lvl.level_code: lvl for lvl in
+              PerformanceLevel.objects.filter(scheme=scheme, is_active=True)}
+
+    score_val = float(mark_entry.score or 0)
+    level_code = get_performance_level(score_val)
+    overall_level = levels.get(level_code)
+
+    assessment, _ = StudentCBAAssessment.objects.update_or_create(
+        student=mark_entry.student,
+        examination=exam,
+        defaults={
+            "overall_level": overall_level,
+            "score": Decimal(score_val),
+            "teacher_notes": f"Updated by admin. Score: {mark_entry.score}",
+        },
+    )
+    return assessment
+
+
+def recalculate_overall_for_student(examination, student):
+    """Recalculate the overall result (``StudentOverallKCSE`` or
+    ``StudentOverallCBA``) for a single student after their marks changed.
+    """
+    from .models import (
+        StudentKCSEGrade, StudentOverallKCSE,
+        StudentCBAAssessment, StudentOverallCBA,
+        AssessmentScheme, KCSEOverallCalculation, PerformanceLevel,
+    )
+
+    if examination.curriculum.code == "844":
+        return _recalculate_kcse_overall(examination, student)
+    elif examination.curriculum.code == "CBC":
+        return _recalculate_cba_overall(examination, student)
+    return None
+
+
+def _recalculate_kcse_overall(examination, student):
+    """Recalculate the overall KCSE result for one student."""
+    from .models import (
+        StudentKCSEGrade, StudentOverallKCSE,
+        AssessmentScheme, KCSEOverallCalculation,
+    )
+
+    scheme = get_scheme_for_curriculum("844")
+    if not scheme:
+        return None
+
+    calculation = KCSEOverallCalculation.objects.filter(scheme=scheme, is_active=True).first()
+    rules = None
+    if calculation:
+        rules = KCSEGradeRule.objects.filter(scheme=scheme, is_active=True).order_by("order")
+
+    grades = StudentKCSEGrade.objects.filter(
+        student=student, examination=examination
+    ).select_related("subject")
+
+    core_points = []
+    best_points = []
+
+    for grade in grades:
+        if grade.is_core:
+            core_points.append(float(grade.points))
+        else:
+            best_points.append(float(grade.points))
+
+    best_points.sort(reverse=True)
+    best_count = min(calculation.best_subject_count, len(best_points)) if calculation else 5
+    selected_best = best_points[:best_count]
+    total_points = sum(core_points) + sum(selected_best)
+    total_subjects = len(core_points) + len(selected_best)
+    mean_score = round(total_points / total_subjects, 1) if total_subjects else 0
+    mean_grade = _kcse_mean_grade(calculation, mean_score)
+
+    return StudentOverallKCSE.objects.update_or_create(
+        student=student,
+        examination=examination,
+        defaults={
+            "total_points": total_points,
+            "mean_grade": mean_grade,
+            "mean_score": mean_score,
+            "core_subjects_count": len(core_points),
+            "best_subjects_count": len(selected_best),
+            "total_subjects_used": total_subjects,
+        },
+    )[0]
+
+
+def _recalculate_cba_overall(examination, student):
+    """Recalculate the overall CBC / CBA result for one student."""
+    from .models import (
+        StudentCBAAssessment, StudentOverallCBA,
+        AssessmentScheme, PerformanceLevel,
+    )
+
+    scheme = get_scheme_for_curriculum("CBC")
+    if not scheme:
+        return None
+
+    levels = {lvl.level_code: lvl for lvl in
+              PerformanceLevel.objects.filter(scheme=scheme, is_active=True)}
+
+    assessments = StudentCBAAssessment.objects.filter(
+        student=student, examination=examination
+    ).select_related("subject", "overall_level")
+
+    subject_scores = {}
+    component_scores = {}
+
+    for assessment in assessments:
+        if assessment.score is not None:
+            subject_scores[assessment.subject.name] = float(assessment.score)
+
+    total_score = round(sum(subject_scores.values()) / len(subject_scores), 1) if subject_scores else 0
+    overall_level = levels.get(get_performance_level(total_score))
+
+    return StudentOverallCBA.objects.update_or_create(
+        student=student,
+        examination=examination,
+        defaults={
+            "overall_level": overall_level,
+            "component_scores": subject_scores,
+            "total_score": Decimal(total_score),
+            "total_weighted_score": Decimal(total_score),
+        },
+    )[0]
+
+
+def recalculate_for_mark_change(mark_entry):
+    """Full pipeline: when a ``MarkEntry`` is edited (by admin or teacher),
+    recalculate the dependent grade rows and the student's overall result.
+
+    Parameters
+    ----------
+    mark_entry : MarkEntry
+        The mark that was just saved (already has the new score).
+
+    Returns
+    -------
+    dict with keys ``subject_grade`` and ``overall`` (the recalculated rows,
+    or None if the examination's curriculum is not supported).
+    """
+    subject_grade = None
+    overall = None
+
+    if mark_entry.examination.curriculum.code == "844":
+        subject_grade = recalculate_student_kcse_grade(mark_entry)
+    elif mark_entry.examination.curriculum.code == "CBC":
+        subject_grade = recalculate_student_cba_grade(mark_entry)
+
+    overall = recalculate_overall_for_student(mark_entry.examination, mark_entry.student)
+
+    return {"subject_grade": subject_grade, "overall": overall}

@@ -1,15 +1,26 @@
 ﻿from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.db.models import Q
 from django.core.paginator import Paginator
+from django.urls import reverse
 from datetime import datetime
 from .models import MarkEntry, MarkSubmission, MarkCorrection
 from examinations.models import Examination
 from school.models import Subject, GradeLevel, Stream
 from students.models import Student
 from teachers.models import TeacherProfile
+from core.access import is_admin
+from core.models import AuditLog
+from core.access import send_notification
+from grading.services import recalculate_for_mark_change
+
+
+def _is_admin_user(user):
+    return is_admin(user)
+
+
 
 @login_required
 def mark_entry(request):
@@ -270,9 +281,33 @@ def mark_correction(request):
                 mark_entry = correction.mark_entry
                 mark_entry.score = correction.new_score
                 mark_entry.updated_by = request.user
-                mark_entry.save()
-                
-                messages.success(request, 'Correction approved!')
+                mark_entry.save(update_fields=['score', 'updated_by'])
+
+                # Recalculate dependent grades
+                try:
+                    result = recalculate_for_mark_change(mark_entry)
+                    if result.get('subject_grade'):
+                        messages.success(request, 'Correction approved! Grade recalculated.')
+                    else:
+                        messages.success(request, 'Correction approved!')
+                except Exception:
+                    messages.success(request, 'Correction approved! (Grade recalculation skipped.)')
+
+                send_notification(
+                    mark_entry.entered_by,
+                    title="Mark Correction Approved",
+                    message=(
+                        f"Your correction request for {mark_entry.student.full_name} "
+                        f"({mark_entry.subject.name}) has been approved.\n\n"
+                        f"New score: {correction.new_score}\n"
+                        f"Notes: {admin_notes}" if admin_notes else
+                        f"Your correction request for {mark_entry.student.full_name} "
+                        f"({mark_entry.subject.name}) has been approved.\n\n"
+                        f"New score: {correction.new_score}"
+                    ),
+                    notification_type="MARK_EDIT",
+                    url=reverse('marks:correction'),
+                )
                 
             elif action == 'reject':
                 correction.status = 'REJECTED'
@@ -312,6 +347,159 @@ def mark_correction(request):
         'is_admin': is_admin,
     }
     return render(request, 'marks/correction.html', context)
+
+
+# ========================================================
+# Admin mark management — direct mark correction
+# ========================================================
+
+@login_required
+@user_passes_test(_is_admin_user)
+def admin_mark_management(request):
+    """Admin view to search, list, and directly edit student marks."""
+    exam_id = request.GET.get('exam_id')
+    subject_id = request.GET.get('subject_id')
+    grade_level_id = request.GET.get('grade_level_id')
+    stream_id = request.GET.get('stream_id')
+    student_search = request.GET.get('student_search', '').strip()
+
+    marks = MarkEntry.objects.select_related(
+        'student', 'examination', 'subject', 'entered_by'
+    ).order_by('-updated_at')
+
+    if exam_id:
+        marks = marks.filter(examination_id=exam_id)
+    if subject_id:
+        marks = marks.filter(subject_id=subject_id)
+    if grade_level_id:
+        marks = marks.filter(grade_level_id=grade_level_id)
+    if stream_id:
+        marks = marks.filter(stream_id=stream_id)
+    if student_search:
+        marks = marks.filter(
+            Q(student__full_name__icontains=student_search) |
+            Q(student__admission_number__icontains=student_search)
+        )
+
+    exams = Examination.objects.all().order_by('-start_date')
+    subjects = Subject.objects.all().order_by('name')
+    grade_levels = GradeLevel.objects.all().order_by('name')
+    streams = Stream.objects.all().order_by('name')
+
+    paginator = Paginator(marks, 50)
+    page_number = request.GET.get('page')
+    marks_page = paginator.get_page(page_number)
+
+    context = {
+        'marks': marks_page,
+        'exams': exams,
+        'subjects': subjects,
+        'grade_levels': grade_levels,
+        'streams': streams,
+        'exam_id': exam_id or '',
+        'subject_id': subject_id or '',
+        'grade_level_id': grade_level_id or '',
+        'stream_id': stream_id or '',
+        'student_search': student_search,
+        'is_admin': True,
+    }
+    return render(request, 'marks/admin_mark_management.html', context)
+
+
+@login_required
+@user_passes_test(_is_admin_user)
+def admin_mark_edit(request, mark_entry_id):
+    """Admin view to directly edit a single mark entry.
+
+    Allows the admin to change the score, and optionally recalculate
+    dependent grades automatically.
+    """
+    mark_entry = get_object_or_404(
+        MarkEntry.objects.select_related(
+            'student', 'examination', 'subject', 'entered_by'
+        ),
+        id=mark_entry_id
+    )
+
+    old_score = mark_entry.score
+
+    if request.method == 'POST':
+        new_score_str = request.POST.get('score')
+        reason = request.POST.get('reason', '').strip()
+        recalculate_grades = request.POST.get('recalculate', 'on') == 'on'
+
+        if new_score_str:
+            try:
+                new_score = float(new_score_str)
+                if not (0 <= new_score <= 100):
+                    messages.error(request, 'Score must be between 0 and 100.')
+                    return redirect('marks:admin_mark_edit', mark_entry_id=mark_entry_id)
+            except ValueError:
+                messages.error(request, 'Invalid score value.')
+                return redirect('marks:admin_mark_edit', mark_entry_id=mark_entry_id)
+
+            if new_score != float(old_score or 0):
+                if not reason:
+                    messages.error(request, 'Reason is required when changing the score.')
+                    return redirect('marks:admin_mark_edit', mark_entry_id=mark_entry_id)
+
+                mark_entry.score = new_score
+                mark_entry.updated_by = request.user
+                mark_entry.save(update_fields=['score', 'updated_by'])
+
+                AuditLog.objects.create(
+                    user=request.user,
+                    action='UPDATE',
+                    model_name='MarkEntry',
+                    object_id=str(mark_entry.id),
+                    object_repr=str(mark_entry),
+                    changes={
+                        'old_score': str(old_score),
+                        'new_score': str(new_score),
+                        'reason': reason,
+                    },
+                    ip_address=request.META.get('REMOTE_ADDR', ''),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                )
+
+                if recalculate_grades:
+                    result = recalculate_for_mark_change(mark_entry)
+                    if result.get('subject_grade'):
+                        messages.success(
+                            request,
+                            f'Score updated from {old_score} to {new_score}. '
+                            f'Grade recalculated: {result["subject_grade"]}.'
+                        )
+                    else:
+                        messages.success(request, f'Score updated from {old_score} to {new_score}.')
+                else:
+                    messages.success(request, f'Score updated from {old_score} to {new_score}.')
+
+                send_notification(
+                    mark_entry.entered_by,
+                    title="Mark Correction — Admin Edit",
+                    message=(
+                        f"Your mark entry for {mark_entry.student.full_name} "
+                        f"({mark_entry.subject.name}) has been corrected by an administrator.\n\n"
+                        f"Old: {old_score} → New: {new_score}\n"
+                        f"Reason: {reason}"
+                    ),
+                    notification_type="MARK_EDIT",
+                    url=reverse('marks:admin_mark_edit', args=[mark_entry_id]) if request.user.is_staff else None,
+                )
+        else:
+            messages.error(request, 'A score value is required.')
+            return redirect('marks:admin_mark_edit', mark_entry_id=mark_entry_id)
+
+        return redirect('marks:admin_mark_management')
+
+    context = {
+        'mark_entry': mark_entry,
+        'old_score': old_score,
+        'is_admin': True,
+    }
+    return render(request, 'marks/admin_mark_edit.html', context)
+
 
 
 @login_required

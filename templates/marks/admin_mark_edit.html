@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Edit Mark - EduGrade{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-edit"></i> Edit Mark</h2>
+        <div>
+            <a href="{% url 'marks:admin_mark_management' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Management
+            </a>
+        </div>
+    </div>
+
+    <!-- Mark Details Card -->
+    <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-info-circle"></i>
+                Mark Entry Details
+            </h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td class="fw-bold">Student:</td>
+                            <td>{{ mark_entry.student.full_name }}</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-bold">Admission #:</td>
+                            <td>{{ mark_entry.student.admission_number }}</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-bold">Examination:</td>
+                            <td>{{ mark_entry.examination.name }}</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-bold">Subject:</td>
+                            <td>{{ mark_entry.subject.name }}</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td class="fw-bold">Grade:</td>
+                            <td>{{ mark_entry.grade_level.name }} {{ mark_entry.stream.name }}</td>
+                        </tr>
+                        <tr>
+                            <td class="fw-bold">Current Score:</td>
+                            <td>
+                                <span class="badge bg-info fs-5">{{ old_score }}</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="fw-bold">Status:</td>
+                            <td>
+                                <span class="badge bg-{% if mark_entry.status == 'APPROVED' %}success{% elif mark_entry.status == 'SUBMITTED' %}info{% else %}secondary{% endif %}">
+                                    {{ mark_entry.status }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="fw-bold">Entered By:</td>
+                            <td>{{ mark_entry.entered_by.get_full_name|default:mark_entry.entered_by.username }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Form -->
+    <div class="card shadow">
+        <div class="card-header bg-warning text-dark">
+            <h5 class="mb-0">
+                <i class="fas fa-pen"></i>
+                Correct Mark
+            </h5>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label for="score" class="form-label">New Score (0-100)</label>
+                        <input type="number" class="form-control" id="score" name="score"
+                               value="{{ old_score }}" min="0" max="100" step="0.5" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="reason" class="form-label">Reason for Change *</label>
+                        <textarea class="form-control" id="reason" name="reason" rows="2"
+                                  placeholder="Explain why the mark is being changed..." required></textarea>
+                    </div>
+                    <div class="col-md-4 d-flex align-items-end">
+                        <div class="form-check mb-2">
+                            <input class="form-check-input" type="checkbox" id="recalculate" name="recalculate" value="on" checked>
+                            <label class="form-check-label" for="recalculate">
+                                Recalculate dependent grades
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-warning mt-3">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Warning:</strong> You are about to modify a student's mark.
+                    This action will be logged in the audit trail and a notification
+                    will be sent to the original teacher. Please ensure the new score
+                    is accurate.
+                </div>
+
+                <div class="text-end mt-4">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        <i class="fas fa-save"></i> Update Mark
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
