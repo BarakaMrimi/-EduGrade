@@ -5,6 +5,8 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from core.models import Role, UserProfile
 from teachers.models import TeacherProfile
+from core.access import send_notification, send_approval_reminder
+from datetime import datetime
 
 def register(request):
     """User registration view"""
@@ -44,6 +46,45 @@ def register(request):
             defaults={'description': 'Teacher Role'}
         )
         UserProfile.objects.create(user=user, role=role)
+        
+        # Create teacher profile automatically
+        teacher = TeacherProfile.objects.create(
+            user=user,
+            staff_number=username,
+            first_name=first_name,
+            last_name=last_name,
+            middle_name='',
+            gender='M',
+            date_of_birth='2000-01-01',
+            phone_number='',
+            email=email,
+            address='',
+            employment_date=datetime.now().date(),
+            qualification='',
+            specialization='',
+            status='INACTIVE',
+            is_active=False,
+            created_via='SELF_REGISTER',
+        )
+        
+        # Notify admins about new teacher
+        send_approval_reminder(user)
+        
+        # Send welcome notification to teacher
+        send_notification(
+            user,
+            title="Welcome to EduGrade!",
+            message=(
+                f"Welcome, {first_name}! Your account has been created successfully.\n\n"
+                f"Next steps:\n"
+                f"1. Complete your profile\n"
+                f"2. Request admin approval to activate your account\n"
+                f"3. Once approved, you can start entering marks and viewing reports\n\n"
+                f"Click below to request approval now."
+            ),
+            notification_type="SYSTEM",
+            url="/teachers/request-approval/",
+        )
         
         # Log the user in
         login(request, user)

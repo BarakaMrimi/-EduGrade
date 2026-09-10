@@ -30,7 +30,7 @@ INSTALLED_APPS = [
     'marks',
     'examinations',
     # Custom apps
-    'authentication',
+    'authentication.apps.AuthenticationConfig',
     'core',
     'users',
     'school',

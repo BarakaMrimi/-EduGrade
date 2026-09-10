@@ -836,7 +836,7 @@ def _recalculate_kcse_overall(examination, student):
     """Recalculate the overall KCSE result for one student."""
     from .models import (
         StudentKCSEGrade, StudentOverallKCSE,
-        AssessmentScheme, KCSEOverallCalculation,
+        AssessmentScheme, KCSEOverallCalculation, KCSEGradeRule,
     )
 
     scheme = get_scheme_for_curriculum("844")

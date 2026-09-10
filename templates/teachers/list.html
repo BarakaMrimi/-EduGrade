@@ -8,9 +8,6 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <a href="{% url 'teachers:create' %}" class="btn btn-success">
-            <i class="fas fa-user-plus"></i> Add Teacher
-        </a>
         <a href="{% url 'teachers:class_teacher_list' %}" class="btn btn-info">
             <i class="fas fa-users-cog"></i> Class Teachers
         </a>
@@ -61,6 +58,7 @@
                         <th>Gender</th>
                         <th>Qualification</th>
                         <th>Status</th>
+                        <th>Source</th>
                         <th class="text-center">Actions</th>
                     </tr>
                 </thead>
@@ -84,6 +82,11 @@
                         <td>
                             <span class="badge-status bg-{% if teacher.status == 'ACTIVE' %}success{% elif teacher.status == 'ON_LEAVE' %}warning{% else %}secondary{% endif %} text-white">
                                 {{ teacher.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge bg-{% if teacher.created_via == 'SELF_REGISTER' %}info{% else %}secondary{% endif %}">
+                                {{ teacher.get_created_via_display }}
                             </span>
                         </td>
                         <td class="text-center">

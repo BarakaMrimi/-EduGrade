@@ -7,7 +7,6 @@ app_name = 'teachers'
 urlpatterns = [
     # Teacher URLs
     path('', views.teacher_list, name='list'),
-    path('create/', views.teacher_create, name='create'),
     path('<int:teacher_id>/', views.teacher_detail, name='detail'),
     path('<int:teacher_id>/edit/', views.teacher_edit, name='edit'),
     path('<int:teacher_id>/assign/', views.teacher_assign, name='assign'),
@@ -27,4 +26,7 @@ urlpatterns = [
     path('class-teachers/requests/', class_teacher_views.class_teacher_request_list, name='class_teacher_requests'),
     path('class-teachers/requests/create/', class_teacher_views.class_teacher_request_create, name='class_teacher_request_create'),
     path('class-teachers/requests/<int:request_id>/review/', class_teacher_views.class_teacher_request_review, name='class_teacher_request_review'),
+
+    # Teacher self-service
+    path('request-approval/', views.teacher_request_approval, name='request_approval'),
 ]

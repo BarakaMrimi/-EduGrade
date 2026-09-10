@@ -8,7 +8,8 @@ from .models import Student, StudentHistory
 from school.models import AcademicYear, Curriculum, GradeLevel, Stream
 from django.contrib.auth.models import User
 from datetime import datetime
-from core.access import can_manage_student, can_use_class, permitted_student_queryset
+from core.access import can_manage_student, can_use_class, permitted_student_queryset, can_edit_student
+from teachers.models import ClassTeacher, TeacherProfile
 
 try:
     from grading.models import (
@@ -274,7 +275,16 @@ def student_detail(request, student_id):
 
 @login_required
 def student_create(request):
-    """Create a new student"""
+    """Create a new student — admin and class teachers only."""
+    if not is_admin(request.user):
+        try:
+            teacher = TeacherProfile.objects.get(user=request.user)
+            if not ClassTeacher.objects.filter(teacher=teacher, is_active=True).exists():
+                messages.error(request, 'Only administrators and class teachers can register learners.')
+                return redirect('core:dashboard')
+        except TeacherProfile.DoesNotExist:
+            messages.error(request, 'You do not have a teacher profile.')
+            return redirect('core:dashboard')
     if request.method == 'POST':
         try:
             # Get form data
@@ -369,8 +379,12 @@ def student_create(request):
 
 @login_required
 def student_edit(request, student_id):
-    """Edit student details"""
+    """Edit student details — admin and class teachers only."""
     student = get_object_or_404(permitted_student_queryset(request.user), id=student_id)
+    
+    if not is_admin(request.user) and not can_edit_student(request.user, student):
+        messages.error(request, 'Only administrators and class teachers can edit learner details.')
+        return redirect('students:detail', student_id=student.id)
     
     if request.method == 'POST':
         try:
@@ -435,8 +449,12 @@ def student_edit(request, student_id):
 
 @login_required
 def student_delete(request, student_id):
-    """Delete/Deactivate a student"""
+    """Delete/Deactivate a student — admin and class teachers only."""
     student = get_object_or_404(permitted_student_queryset(request.user), id=student_id)
+    
+    if not is_admin(request.user) and not can_edit_student(request.user, student):
+        messages.error(request, 'Only administrators and class teachers can delete or deactivate learners.')
+        return redirect('students:detail', student_id=student.id)
     
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -457,8 +475,12 @@ def student_delete(request, student_id):
 
 @login_required
 def student_transfer(request, student_id):
-    """Transfer student to another class"""
+    """Transfer student to another class — admin and class teachers only."""
     student = get_object_or_404(permitted_student_queryset(request.user), id=student_id)
+    
+    if not is_admin(request.user) and not can_edit_student(request.user, student):
+        messages.error(request, 'Only administrators and class teachers can transfer learners.')
+        return redirect('students:detail', student_id=student.id)
     
     if request.method == 'POST':
         new_grade_level_id = request.POST.get('grade_level')

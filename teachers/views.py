@@ -19,7 +19,10 @@ def _is_admin(user):
 
 @login_required
 def teacher_list(request):
-    """List all teachers"""
+    """List all registered teachers — admin only."""
+    if not _is_admin(request.user):
+        messages.error(request, 'Only administrators can view all teachers.')
+        return redirect('core:dashboard')
     teachers = TeacherProfile.objects.select_related('user').all()
     
     search_query = request.GET.get('search', '')
@@ -54,9 +57,13 @@ def teacher_list(request):
 
 @login_required
 def teacher_detail(request, teacher_id):
-    """View teacher details"""
+    """View teacher details — admin can view all, teachers can view their own."""
     teacher = get_object_or_404(TeacherProfile, id=teacher_id)
     is_admin = _is_admin(request.user)
+    
+    if not is_admin and teacher.user_id != request.user.id:
+        messages.error(request, 'You can only view your own profile.')
+        return redirect('core:dashboard')
 
     if request.method == 'POST':
         if not is_admin:
@@ -151,82 +158,11 @@ def teacher_assignment_delete(request, assignment_id):
 
 
 @login_required
-def teacher_create(request):
-    """Create a new teacher — admin only."""
-    if not is_admin(request.user):
-        messages.error(request, 'Only administrators can create teacher accounts.')
-        return redirect('core:dashboard')
-    if request.method == 'POST':
-        try:
-            # Get form data
-            staff_number = request.POST.get('staff_number')
-            tsc_number = request.POST.get('tsc_number') or None
-            first_name = request.POST.get('first_name')
-            last_name = request.POST.get('last_name')
-            middle_name = request.POST.get('middle_name', '')
-            gender = request.POST.get('gender')
-            date_of_birth = request.POST.get('date_of_birth')
-            phone_number = request.POST.get('phone_number')
-            email = request.POST.get('email')
-            address = request.POST.get('address', '')
-            employment_date = request.POST.get('employment_date')
-            qualification = request.POST.get('qualification')
-            specialization = request.POST.get('specialization', '')
-            status = request.POST.get('status', 'ACTIVE')
-            
-            # Create user account
-            username = staff_number.lower()
-            password = request.POST.get('password')
-            
-            if User.objects.filter(username=username).exists():
-                messages.error(request, f'Username {username} already exists!')
-                return redirect('teachers:create')
-            
-            user = User.objects.create_user(
-                username=username,
-                email=email,
-                password=password,
-                first_name=first_name,
-                last_name=last_name
-            )
-            
-            # Create teacher profile
-            teacher = TeacherProfile.objects.create(
-                user=user,
-                staff_number=staff_number,
-                tsc_number=tsc_number,
-                first_name=first_name,
-                last_name=last_name,
-                middle_name=middle_name,
-                gender=gender,
-                date_of_birth=date_of_birth,
-                phone_number=phone_number,
-                email=email,
-                address=address,
-                employment_date=employment_date,
-                qualification=qualification,
-                specialization=specialization,
-                status=status,
-                created_by=request.user
-            )
-            
-            messages.success(request, f'Teacher {teacher.full_name} created successfully!')
-            return redirect('teachers:detail', teacher_id=teacher.id)
-            
-        except Exception as e:
-            messages.error(request, f'Error creating teacher: {str(e)}')
-            return redirect('teachers:create')
-    
-    context = {
-        'gender_choices': TeacherProfile.GENDER_CHOICES,
-        'status_choices': TeacherProfile.STATUS_CHOICES,
-    }
-    return render(request, 'teachers/create.html', context)
-
-
-@login_required
 def teacher_edit(request, teacher_id):
-    """Edit teacher details"""
+    """Edit teacher details — admin only."""
+    if not _is_admin(request.user):
+        messages.error(request, 'Only administrators can edit teacher profiles.')
+        return redirect('core:dashboard')
     teacher = get_object_or_404(TeacherProfile, id=teacher_id)
     
     if request.method == 'POST':
@@ -278,7 +214,10 @@ def teacher_edit(request, teacher_id):
 
 @login_required
 def teacher_assign(request, teacher_id):
-    """Assign teacher to subject and class"""
+    """Assign teacher to subject and class — admin only."""
+    if not _is_admin(request.user):
+        messages.error(request, 'Only administrators can manage teacher assignments.')
+        return redirect('core:dashboard')
     teacher = get_object_or_404(TeacherProfile, id=teacher_id)
     
     if request.method == 'POST':
@@ -518,3 +457,25 @@ def api_teachers_search(request):
         ).values('id', 'staff_number', 'first_name', 'last_name')[:10]
         return JsonResponse({'teachers': list(teachers)})
     return JsonResponse({'teachers': []})
+
+
+@login_required
+def teacher_request_approval(request):
+    """Allow an unapproved/inactive teacher to remind admin to approve their account."""
+    try:
+        teacher = TeacherProfile.objects.get(user=request.user)
+    except TeacherProfile.DoesNotExist:
+        messages.error(request, 'You do not have a teacher profile. Contact the administrator.')
+        return redirect('core:dashboard')
+
+    if request.method == 'POST':
+        from core.access import send_approval_reminder
+        send_approval_reminder(request.user)
+        messages.success(request, 'Approval request sent to administrators. You will be notified once your account is approved.')
+        return redirect('core:dashboard')
+
+    context = {
+        'teacher': teacher,
+        'is_pending': not teacher.is_active or teacher.status in ('INACTIVE', 'PENDING'),
+    }
+    return render(request, 'teachers/request_approval.html', context)

@@ -42,7 +42,8 @@
                 <p><strong>Role</strong><br>{{ teacher.user.profile.role.get_name_display|default:'No role assigned' }}</p>
                 <p><strong>Qualification</strong><br>{{ teacher.qualification }}</p>
                 <p><strong>Specialization</strong><br>{{ teacher.specialization|default:'Not specified' }}</p>
-                <p class="mb-0"><strong>Employment date</strong><br>{{ teacher.employment_date|date:'d M Y' }}</p>
+                <p><strong>Employment date</strong><br>{{ teacher.employment_date|date:'d M Y' }}</p>
+                <p class="mb-0"><strong>Registration source</strong><br>{{ teacher.get_created_via_display }}</p>
             </div></div>
 
             {% if is_admin %}

@@ -326,6 +326,19 @@ def mark_correction(request):
             
             mark_entry = get_object_or_404(MarkEntry, id=mark_entry_id)
             
+            # Check if teacher is authorized to request correction for this mark
+            is_authorized = mark_entry.entered_by == request.user or \
+                teacher.assignments.filter(
+                    subject=mark_entry.subject,
+                    grade_level=mark_entry.grade_level,
+                    stream=mark_entry.stream,
+                    status='APPROVED'
+                ).exists()
+            
+            if not is_authorized:
+                messages.error(request, 'You can only request corrections for marks you entered or are assigned to.')
+                return redirect('marks:correction')
+            
             # Check if correction already exists
             if MarkCorrection.objects.filter(mark_entry=mark_entry, status='PENDING').exists():
                 messages.error(request, 'A correction request is already pending for this mark!')
@@ -377,7 +390,8 @@ def admin_mark_management(request):
         marks = marks.filter(stream_id=stream_id)
     if student_search:
         marks = marks.filter(
-            Q(student__full_name__icontains=student_search) |
+            Q(student__first_name__icontains=student_search) |
+            Q(student__last_name__icontains=student_search) |
             Q(student__admission_number__icontains=student_search)
         )
 
@@ -463,15 +477,22 @@ def admin_mark_edit(request, mark_entry_id):
                 )
 
                 if recalculate_grades:
-                    result = recalculate_for_mark_change(mark_entry)
-                    if result.get('subject_grade'):
+                    try:
+                        result = recalculate_for_mark_change(mark_entry)
+                        if result.get('subject_grade'):
+                            messages.success(
+                                request,
+                                f'Score updated from {old_score} to {new_score}. '
+                                f'Grade recalculated: {result["subject_grade"]}.'
+                            )
+                        else:
+                            messages.success(request, f'Score updated from {old_score} to {new_score}.')
+                    except Exception:
                         messages.success(
                             request,
                             f'Score updated from {old_score} to {new_score}. '
-                            f'Grade recalculated: {result["subject_grade"]}.'
+                            f'(Grade recalculation failed — check grading scheme configuration.)'
                         )
-                    else:
-                        messages.success(request, f'Score updated from {old_score} to {new_score}.')
                 else:
                     messages.success(request, f'Score updated from {old_score} to {new_score}.')
 

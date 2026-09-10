@@ -47,6 +47,12 @@ class TeacherProfile(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_teachers')
     updated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='updated_teachers')
     
+    CREATED_VIA_CHOICES = [
+        ('SELF_REGISTER', 'Self-Registered'),
+        ('MANUAL', 'Manually Added'),
+    ]
+    created_via = models.CharField(max_length=20, choices=CREATED_VIA_CHOICES, default='SELF_REGISTER')
+    
     def __str__(self):
         return f"{self.staff_number} - {self.full_name}"
     
@@ -55,6 +61,10 @@ class TeacherProfile(models.Model):
         if self.middle_name:
             return f"{self.first_name} {self.middle_name} {self.last_name}"
         return f"{self.first_name} {self.last_name}"
+    
+    @property
+    def can_manage_students(self):
+        return self.class_teacher_assignments.filter(is_active=True).exists()
     
     class Meta:
         db_table = 'teacher_profiles'

@@ -12,7 +12,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from students.models import Student
-from teachers.models import ClassTeacher, TeacherProfile
+from teachers.models import ClassTeacher, TeacherProfile, TeacherAssignment
 from core.permissions import Permission
 from core.models import PermissionAssignment, Notification
 
@@ -50,16 +50,73 @@ def class_teacher_assignments(user):
     ).select_related('grade_level', 'stream', 'academic_year')
 
 
+def subject_teacher_assignments(user):
+    """Return approved TeacherAssignment rows for the logged-in teacher."""
+    if not user.is_authenticated:
+        return TeacherAssignment.objects.none()
+
+    if is_admin(user):
+        return TeacherAssignment.objects.filter(status='APPROVED').select_related(
+            'teacher', 'subject', 'grade_level', 'stream', 'academic_year'
+        )
+
+    teacher = TeacherProfile.objects.filter(user=user, is_active=True).first()
+    if not teacher:
+        return TeacherAssignment.objects.none()
+
+    return TeacherAssignment.objects.filter(
+        teacher=teacher,
+        status='APPROVED',
+    ).select_related('subject', 'grade_level', 'stream', 'academic_year')
+
+
 # ========================================================
 # Scoped student queryset
 # ========================================================
 
 def permitted_student_queryset(user):
-    """Admins see all students; class teachers see assigned classes only."""
+    """All authenticated teachers can VIEW students in their assigned classes.
+
+    Admins see all students.
+    Class teachers see students in their assigned grade/stream/year.
+    Subject teachers see students in the classes/subjects they are assigned to.
+    """
     students = Student.objects.all()
     if is_admin(user):
         return students
 
+    # Class teacher scope (grade + stream + academic year)
+    ct_scope = Q()
+    for assignment in class_teacher_assignments(user):
+        ct_scope |= Q(
+            current_grade_level=assignment.grade_level,
+            current_stream=assignment.stream,
+            academic_year=assignment.academic_year,
+        )
+
+    # Subject teacher scope (grade + stream + academic year via assignments)
+    subject_scope = Q()
+    for assignment in subject_teacher_assignments(user):
+        subject_scope |= Q(
+            current_grade_level=assignment.grade_level,
+            current_stream=assignment.stream,
+            academic_year=assignment.academic_year,
+        )
+
+    scope = ct_scope | subject_scope
+    return students.filter(scope) if scope else Student.objects.none()
+
+
+def can_manage_student(user, student):
+    """Can the user EDIT a particular student?
+
+    Admins and class teachers can edit students in their scope.
+    Subject teachers can VIEW but NOT EDIT students.
+    """
+    if is_admin(user):
+        return True
+
+    # Only class teachers (or users with class-level permission) can edit
     assignments = class_teacher_assignments(user)
     scope = Q()
     for assignment in assignments:
@@ -68,14 +125,12 @@ def permitted_student_queryset(user):
             current_stream=assignment.stream,
             academic_year=assignment.academic_year,
         )
-    return students.filter(scope) if scope else Student.objects.none()
+    return Student.objects.filter(scope).filter(pk=student.pk).exists()
 
 
-def can_manage_student(user, student):
-    """Can the user manage (view/edit) a particular student?"""
-    if is_admin(user):
-        return True
-    return permitted_student_queryset(user).filter(pk=student.pk).exists()
+def can_edit_student(user, student):
+    """Alias for can_manage_student — explicit edit check."""
+    return can_manage_student(user, student)
 
 
 # ========================================================
@@ -397,3 +452,28 @@ def unread_notification_count(user):
     if not user.is_authenticated:
         return 0
     return Notification.objects.filter(recipient=user, is_read=False).count()
+
+
+# ========================================================
+# Approval-reminder helper
+# ========================================================
+
+def send_approval_reminder(user):
+    """Notify all admin users that *user* is requesting account approval/role assignment."""
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    admins = User.objects.filter(is_staff=True, is_active=True)
+    teacher_name = user.get_full_name() or user.username
+    for admin in admins:
+        send_notification(
+            admin,
+            title="Teacher Approval Request",
+            message=(
+                f"{teacher_name} is requesting account approval and role assignment.\n\n"
+                f"Please review their profile and assign an appropriate role.\n\n"
+                f"User: {user.username}\n"
+                f"Name: {teacher_name}"
+            ),
+            notification_type="APPROVAL_REQUEST",
+            url="/teachers/",
+        )
