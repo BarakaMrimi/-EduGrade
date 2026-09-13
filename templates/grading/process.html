@@ -24,7 +24,7 @@
                             <select class="form-select" id="examination" name="examination" required>
                                 <option value="">Select Examination</option>
                                 {% for exam in examinations %}
-                                    <option value="{{ exam.id }}">{{ exam.name }} ({{ exam.academic_year.year }})</option>
+                                    <option value="{{ exam.id }}">{{ exam.name }} ({{ exam.academic_year.year }}) <small class="text-muted">[{{ exam.get_status_display }}]</small></option>
                                 {% endfor %}
                             </select>
                         </div>

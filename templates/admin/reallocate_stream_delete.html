@@ -1,0 +1,15 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>{{ title }}</h1>
+<p>Students, current academic history, class-teacher assignments, and teacher assignments will be moved to the selected destination before deletion.</p>
+<form method="post">{% csrf_token %}
+  <p><label for="destination_stream">Destination stream</label>
+    <select name="destination_stream" id="destination_stream" required>
+      <option value="">Select stream</option>
+      {% for destination in destination_streams %}<option value="{{ destination.pk }}">{{ destination }}</option>{% endfor %}
+    </select>
+  </p>
+  <input type="submit" value="Reallocate and delete" class="default">
+  <a href="{% url 'admin:school_stream_changelist' %}">Cancel</a>
+</form>
+{% endblock %}

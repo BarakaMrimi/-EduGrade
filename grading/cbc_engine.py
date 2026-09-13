@@ -169,13 +169,15 @@ class CBCEngine:
         overall_level = self._get_level_from_score(overall_total)
         
         # Save overall result
-        overall = StudentOverallCBA.objects.create(
+        overall, _created = StudentOverallCBA.objects.update_or_create(
             student=student,
             examination=self.examination,
-            overall_level=overall_level,
-            component_scores=component_results,
-            total_score=overall_total,
-            total_weighted_score=overall_total
+            defaults={
+                'overall_level': overall_level,
+                'component_scores': component_results,
+                'total_score': overall_total,
+                'total_weighted_score': overall_total
+            }
         )
         
         return {

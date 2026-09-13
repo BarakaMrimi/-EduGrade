@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Delete Stream - EduGrade{% endblock %}
+
+{% block page_title %}Delete Stream{% endblock %}
+
+{% block page_subtitle %}Reallocate students before deleting{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <a href="{% url 'school:setup_dashboard' %}" class="btn btn-outline-secondary btn-sm mb-2">
+        <i class="fas fa-arrow-left"></i> Back to Setup
+      </a>
+      <h3 class="mb-0">Delete Stream</h3>
+    </div>
+  </div>
+
+  <div class="card card-custom mb-4">
+    <div class="card-header bg-danger text-white">
+      <h5 class="mb-0"><i class="fas fa-exclamation-triangle"></i> Confirm Deletion</h5>
+    </div>
+    <div class="card-body">
+      <div class="alert alert-warning">
+        <i class="fas fa-info-circle"></i>
+        <strong>Stream:</strong> {{ stream.name }} ({{ stream.code }}) - {{ stream.grade_level.name }}<br>
+        <strong>Students affected:</strong> {{ student_count }}<br>
+        <strong>Class teachers affected:</strong> {{ stream.classteacher_set.count }}<br>
+        <strong>Teacher assignments affected:</strong> {{ stream.teacherassignment_set.count }}
+      </div>
+      
+      {% if student_count > 0 %}
+      <p class="text-muted">This stream has <strong>{{ student_count }}</strong> student{{ student_count|pluralize }}. You must reallocate them before deletion.</p>
+      {% else %}
+      <p class="text-success">No students in this stream. Safe to delete.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <form method="post" class="card card-custom mb-4">
+    {% csrf_token %}
+    <div class="card-body">
+      <input type="hidden" name="action" value="reallocate">
+      
+      <h6 class="fw-bold mb-3">Reallocate Students</h6>
+      
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label for="target_stream" class="form-label">Target Stream <span class="text-danger">*</span></label>
+          <select class="form-select" id="target_stream" name="target_stream" required>
+            <option value="">Select Target Stream</option>
+            {% for ts in target_streams %}
+              <option value="{{ ts.id }}">{{ ts.name }} ({{ ts.grade_level.name }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div class="col-md-6">
+          <label for="target_grade" class="form-label">Target Grade Level (Optional)</label>
+          <select class="form-select" id="target_grade" name="target_grade">
+            <option value="">Use Target Stream's Grade</option>
+            {% for tg in target_grades %}
+              <option value="{{ tg.id }}">{{ tg.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div class="col-md-6">
+          <label for="target_year" class="form-label">Target Academic Year (Optional)</label>
+          <select class="form-select" id="target_year" name="target_year">
+            <option value="">Keep Current</option>
+            {% for ty in target_years %}
+              <option value="{{ ty.id }}" {% if ty.is_current %}selected{% endif %}>{{ ty.year }} - {{ ty.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      
+      <div class="mt-3">
+        <button type="submit" name="action" value="reallocate" class="btn btn-warning">
+          <i class="fas fa-exchange-alt"></i> Reallocate & Delete
+        </button>
+        <button type="submit" name="action" value="delete" class="btn btn-danger ms-2">
+          <i class="fas fa-trash"></i> Delete Without Reallocation
+        </button>
+        <a href="{% url 'school:setup_dashboard' %}" class="btn btn-secondary ms-2">Cancel</a>
+      </div>
+    </div>
+  </form>
+
+  <div class="card card-custom">
+    <div class="card-header">
+      <i class="fas fa-info-circle me-2"></i>Notes
+    </div>
+    <div class="card-body">
+      <ul class="mb-0">
+        <li><strong>Reallocate & Delete:</strong> Moves students, class-teacher assignments, and teacher assignments to the target stream, records history, then deletes the stream.</li>
+        <li><strong>Delete Without Reallocation:</strong> Only available if no students exist. Otherwise shows error.</li>
+        <li>Student history is recorded for each reallocation.</li>
+        <li>Class-teacher and teacher assignments are moved automatically when the operation succeeds.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const targetStream = document.getElementById('target_stream');
+  const targetGrade = document.getElementById('target_grade');
+  
+  if (targetStream && targetGrade) {
+    const streamOptions = Array.from(targetStream.options).slice(1);
+    
+    function filterGrade() {
+      const selectedStreamId = targetStream.value;
+      const selectedOption = targetStream.querySelector(`option[value="${selectedStreamId}"]`);
+      if (selectedOption) {
+        const streamGrade = selectedOption.dataset.grade;
+        targetGrade.value = streamGrade || '';
+      }
+    }
+    
+    targetStream.addEventListener('change', filterGrade);
+    filterGrade();
+  }
+});
+</script>
+{% endblock %}

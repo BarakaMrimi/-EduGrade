@@ -110,14 +110,16 @@ class KCSEEngine:
             if self.calculation:
                 is_core = self.calculation.core_subjects.filter(id=mark.subject_id).exists()
             
-            student_grade = StudentKCSEGrade.objects.create(
+            student_grade, _created = StudentKCSEGrade.objects.update_or_create(
                 student=student,
                 examination=self.examination,
                 subject=mark.subject,
-                raw_mark=score,
-                grade=grade_result['grade'],
-                points=grade_result['points'],
-                is_core=is_core
+                defaults={
+                    'raw_mark': score,
+                    'grade': grade_result['grade'],
+                    'points': grade_result['points'],
+                    'is_core': is_core,
+                }
             )
             
             grades.append({
@@ -164,15 +166,17 @@ class KCSEEngine:
             mean_score = 0
         
         # Save overall result
-        overall = StudentOverallKCSE.objects.create(
+        overall, _created = StudentOverallKCSE.objects.update_or_create(
             student=student,
             examination=self.examination,
-            total_points=total_points,
-            mean_grade=mean_grade,
-            mean_score=mean_score,
-            core_subjects_count=len(core_subjects),
-            best_subjects_count=len(selected_best),
-            total_subjects_used=total_subjects_used
+            defaults={
+                'total_points': total_points,
+                'mean_grade': mean_grade,
+                'mean_score': mean_score,
+                'core_subjects_count': len(core_subjects),
+                'best_subjects_count': len(selected_best),
+                'total_subjects_used': total_subjects_used,
+            }
         )
         
         return {

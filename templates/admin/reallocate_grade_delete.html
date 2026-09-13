@@ -1,0 +1,31 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<h1>{{ title }}</h1>
+<p>Students, current academic history, class-teacher assignments, and teacher assignments will be moved to the selected destination before deletion.</p>
+<form method="post">{% csrf_token %}
+  <p><label for="destination_grade">Destination grade</label>
+    <select name="destination_grade" id="destination_grade" required>
+      <option value="">Select grade</option>
+      {% for grade in destination_grades %}<option value="{{ grade.pk }}">{{ grade }}</option>{% endfor %}
+    </select>
+  </p>
+  <p><label for="destination_stream">Destination stream</label>
+    <select name="destination_stream" id="destination_stream" required>
+      <option value="">Select stream</option>
+      {% for stream in destination_streams %}<option value="{{ stream.pk }}" data-grade="{{ stream.grade_level_id }}">{{ stream }}</option>{% endfor %}
+    </select>
+  </p>
+  <input type="submit" value="Reallocate and delete" class="default">
+  <a href="{% url 'admin:school_gradelevel_changelist' %}">Cancel</a>
+</form>
+<script>
+  const grade = document.getElementById('destination_grade');
+  const streams = document.getElementById('destination_stream');
+  grade.addEventListener('change', function () {
+    Array.from(streams.options).forEach(option => {
+      option.hidden = option.value && option.dataset.grade !== grade.value;
+    });
+    streams.value = '';
+  });
+</script>
+{% endblock %}

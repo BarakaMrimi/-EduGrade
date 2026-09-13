@@ -2,9 +2,9 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
-from django.db.models import Avg, Max, Min, Count
+from django.db.models import Avg, Max, Min, Count, Q
 from django.core.paginator import Paginator
-from .models import AssessmentScheme, KCSEGradeRule, PerformanceLevel
+from .models import AssessmentScheme, KCSEGradeRule, PerformanceLevel, StudentKCSEGrade, StudentCBAAssessment
 from .kcse_engine import KCSEEngine
 from .cbc_engine import CBCEngine
 from examinations.models import Examination
@@ -70,7 +70,7 @@ def process_marks(request):
     
     # GET request - show form
     context = {
-        'examinations': Examination.objects.filter(status__in=['LOCKED', 'PUBLISHED']),
+        'examinations': Examination.objects.filter(status__in=['DRAFT', 'ACTIVE', 'LOCKED', 'PUBLISHED']).order_by('-created_at'),
         'grade_levels': GradeLevel.objects.filter(is_active=True),
         'streams': Stream.objects.filter(is_active=True),
     }
@@ -129,8 +129,17 @@ def _kcse_class_report(request, examination):
         grade = overall.mean_grade or 'N/A'
         grade_distribution[grade] = grade_distribution.get(grade, 0) + 1
     
-    top_students = overalls.order_by('-mean_score')[:10]
-    
+    # Subject performance
+    subject_performances = StudentKCSEGrade.objects.filter(
+        examination=examination
+    ).values('subject__name').annotate(
+        avg_score=Avg('raw_mark'),
+        max_score=Max('raw_mark'),
+        min_score=Min('raw_mark'),
+    ).order_by('-avg_score')
+
+    top_students = overalls.order_by('-mean_score')[:10].select_related('student')
+
     context = {
         'examination': examination,
         'curriculum_type': 'KCSE',
@@ -142,6 +151,7 @@ def _kcse_class_report(request, examination):
         'pass_count': pass_count,
         'pass_rate': pass_rate,
         'grade_distribution': grade_distribution.items(),
+        'subject_performances': subject_performances,
         'top_students': top_students,
         'is_kcse': True,
     }
@@ -172,8 +182,17 @@ def _cbc_class_report(request, examination):
         level_code = overall.overall_level.level_code if overall.overall_level else 'N/A'
         level_distribution[level_code] = level_distribution.get(level_code, 0) + 1
     
-    top_students = overalls.order_by('-total_score')[:10]
-    
+    # Subject performance
+    subject_performances = StudentCBAAssessment.objects.filter(
+        examination=examination
+    ).values('subject__name').annotate(
+        avg_score=Avg('score'),
+        max_score=Max('score'),
+        min_score=Min('score'),
+    ).order_by('-avg_score')
+
+    top_students = overalls.order_by('-total_score')[:10].select_related('student')
+
     context = {
         'examination': examination,
         'curriculum_type': 'CBC',
@@ -183,6 +202,7 @@ def _cbc_class_report(request, examination):
         'highest_score': highest_score,
         'lowest_score': lowest_score,
         'level_distribution': level_distribution.items(),
+        'subject_performances': subject_performances,
         'top_students': top_students,
         'is_cbc': True,
     }

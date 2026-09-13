@@ -11,6 +11,16 @@ urlpatterns = [
     # School Setup
     path('setup/', setup_views.school_setup_dashboard, name='setup_dashboard'),
     
+    # Curriculum URLs
+    path('curriculum/create/', setup_views.curriculum_create, name='curriculum_create'),
+    path('curriculum/<int:curriculum_id>/edit/', setup_views.curriculum_edit, name='curriculum_edit'),
+    path('curriculum/<int:curriculum_id>/delete/', setup_views.curriculum_delete, name='curriculum_delete'),
+
+    # Term URLs
+    path('term/create/', setup_views.term_create, name='term_create'),
+    path('term/<int:term_id>/edit/', setup_views.term_edit, name='term_edit'),
+    path('term/<int:term_id>/delete/', setup_views.term_delete, name='term_delete'),
+
     # Academic Year URLs
     path('api/academic-years/', setup_views.academic_year_list, name='academic_year_list'),
     path('academic-year/create/', setup_views.academic_year_create, name='academic_year_create'),

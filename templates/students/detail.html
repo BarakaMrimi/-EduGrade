@@ -7,22 +7,25 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <a href="{% url 'students:list' %}" class="btn btn-outline-secondary btn-sm mb-2">
-            <i class="fas fa-arrow-left"></i> Back to Students
-        </a>
-        <h3 class="mb-0">{{ student.full_name }}</h3>
-        <small class="text-muted">Admission number: {{ student.admission_number }}</small>
+        <div>
+            <a href="{% url 'students:list' %}" class="btn btn-outline-secondary btn-sm mb-2">
+                <i class="fas fa-arrow-left"></i> Back to Students
+            </a>
+            <h3 class="mb-0">{{ student.full_name }}</h3>
+            <small class="text-muted">Admission number: {{ student.admission_number }}</small>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'students:edit' student.id %}" class="btn btn-warning">
+                <i class="fas fa-edit"></i> Edit
+            </a>
+            <a href="{% url 'students:transfer' student.id %}" class="btn btn-info">
+                <i class="fas fa-exchange-alt"></i> Transfer
+            </a>
+            <a href="#performance-analysis" class="btn btn-primary">
+                <i class="fas fa-chart-line"></i> Performance Analysis
+            </a>
+        </div>
     </div>
-    <div class="d-flex gap-2">
-        <a href="{% url 'students:edit' student.id %}" class="btn btn-warning">
-            <i class="fas fa-edit"></i> Edit
-        </a>
-        <a href="#performance-analysis" class="btn btn-primary">
-            <i class="fas fa-chart-line"></i> Performance Analysis
-        </a>
-    </div>
-</div>
 
 <div class="row g-4">
     <div class="col-lg-4">

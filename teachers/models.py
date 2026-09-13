@@ -114,30 +114,36 @@ class TeacherRequest(models.Model):
         ('TRANSFER', 'Transfer'),
         ('REMOVE', 'Remove Assignment'),
     ]
-    
+
+    ROLES = [
+        ('teacher', 'Teacher'),
+        ('class_teacher', 'Class Teacher'),
+    ]
+
     REQUEST_STATUS = [
         ('PENDING', 'Pending'),
         ('APPROVED', 'Approved'),
         ('REJECTED', 'Rejected'),
     ]
-    
+
     teacher = models.ForeignKey(TeacherProfile, on_delete=models.CASCADE, related_name='requests')
     request_type = models.CharField(max_length=20, choices=REQUEST_TYPES)
+    role = models.CharField(max_length=20, choices=ROLES, default='teacher')
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE, null=True, blank=True)
     grade_level = models.ForeignKey(GradeLevel, on_delete=models.CASCADE, null=True, blank=True)
     stream = models.ForeignKey(Stream, on_delete=models.CASCADE, null=True, blank=True)
     academic_year = models.ForeignKey(AcademicYear, on_delete=models.CASCADE)
-    
+
     reason = models.TextField()
     status = models.CharField(max_length=20, choices=REQUEST_STATUS, default='PENDING')
     admin_notes = models.TextField(blank=True, null=True)
     requested_date = models.DateTimeField(auto_now_add=True)
     reviewed_date = models.DateTimeField(null=True, blank=True)
     reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_requests')
-    
+
     def __str__(self):
         return f"{self.teacher.full_name} - {self.get_request_type_display()} - {self.status}"
-    
+
     class Meta:
         db_table = 'teacher_requests'
         ordering = ['-requested_date']

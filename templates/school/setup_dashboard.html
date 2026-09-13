@@ -100,6 +100,12 @@
         </button>
     </div>
     <div class="col-md-2 col-4">
+        <button class="quick-action" data-bs-toggle="modal" data-bs-target="#addTermModal">
+            <i class="fas fa-clock text-success"></i>
+            <span>Term</span>
+        </button>
+    </div>
+    <div class="col-md-2 col-4">
         <button class="quick-action" data-bs-toggle="modal" data-bs-target="#addGradeModal">
             <i class="fas fa-layer-group text-success"></i>
             <span>Grade Level</span>
@@ -112,10 +118,73 @@
         </button>
     </div>
     <div class="col-md-2 col-4">
+        <button class="quick-action" data-bs-toggle="modal" data-bs-target="#addCurriculumModal">
+            <i class="fas fa-book text-purple"></i>
+            <span>Curriculum</span>
+        </button>
+    </div>
+    <div class="col-md-2 col-4">
         <button class="quick-action" data-bs-toggle="modal" data-bs-target="#addSubjectModal">
             <i class="fas fa-book-open text-info"></i>
             <span>Subject</span>
         </button>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- CURRICULUM SECTION -->
+<!-- ============================================ -->
+<div class="card-custom mb-4">
+    <div class="card-header">
+        <i class="fas fa-book me-2"></i>Curriculums
+        <button class="btn btn-sm btn-secondary float-end" data-bs-toggle="modal" data-bs-target="#addCurriculumModal">
+            <i class="fas fa-plus"></i> Add Curriculum
+        </button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-custom table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Status</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for curriculum in curriculums %}
+                    <tr>
+                        <td><span class="badge bg-dark">{{ curriculum.code }}</span></td>
+                        <td><strong>{{ curriculum.name }}</strong></td>
+                        <td>{{ curriculum.description|truncatechars:60|default:"—" }}</td>
+                        <td>
+                            {% if curriculum.is_active %}
+                                <span class="badge-status bg-success text-white">Active</span>
+                            {% else %}
+                                <span class="badge-status bg-secondary text-white">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editCurriculumModal{{ curriculum.id }}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteCurriculumModal{{ curriculum.id }}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-3">No curriculums defined</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
@@ -170,6 +239,65 @@
                     {% empty %}
                     <tr>
                         <td colspan="6" class="text-center text-muted py-3">No academic years defined</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ============================================ -->
+<!-- TERMS SECTION -->
+<!-- ============================================ -->
+<div class="card-custom mb-4">
+    <div class="card-header">
+        <i class="fas fa-clock me-2"></i>Terms
+        <button class="btn btn-sm btn-success float-end" data-bs-toggle="modal" data-bs-target="#addTermModal">
+            <i class="fas fa-plus"></i> Add Term
+        </button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-custom table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Term</th>
+                        <th>Academic Year</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Status</th>
+                        <th class="text-center">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for term in terms %}
+                    <tr>
+                        <td><strong>{{ term.get_term_number_display }}</strong></td>
+                        <td>{{ term.academic_year.year }} - {{ term.academic_year.name }}</td>
+                        <td>{{ term.start_date|date:"Y-m-d" }}</td>
+                        <td>{{ term.end_date|date:"Y-m-d" }}</td>
+                        <td>
+                            {% if term.is_active %}
+                                <span class="badge-status bg-success text-white">Active</span>
+                            {% else %}
+                                <span class="badge-status bg-secondary text-white">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editTermModal{{ term.id }}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteTermModal{{ term.id }}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-3">No terms defined</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -361,6 +489,43 @@
 <!-- MODALS - Add / Edit / Delete -->
 <!-- ============================================ -->
 
+<!-- Add Curriculum Modal -->
+<div class="modal fade" id="addCurriculumModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="fas fa-book"></i> Add Curriculum</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:curriculum_create' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Code <span class="text-danger">*</span></label>
+                        <select class="form-select" name="code" required>
+                            <option value="">Select Curriculum</option>
+                            <option value="844">8-4-4</option>
+                            <option value="CBC">CBC</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" placeholder="e.g., 8-4-4 Curriculum" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-dark">Create Curriculum</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Add Academic Year Modal -->
 <div class="modal fade" id="addYearModal" tabindex="-1">
     <div class="modal-dialog">
@@ -396,6 +561,61 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-primary">Create Year</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add Term Modal -->
+<div class="modal fade" id="addTermModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fas fa-clock"></i> Add Term</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:term_create' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Term <span class="text-danger">*</span></label>
+                        <select class="form-select" name="term_number" required>
+                            <option value="">Select Term</option>
+                            <option value="1">Term 1</option>
+                            <option value="2">Term 2</option>
+                            <option value="3">Term 3</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" placeholder="e.g., First Term" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Academic Year <span class="text-danger">*</span></label>
+                        <select class="form-select" name="academic_year" required>
+                            <option value="">Select Academic Year</option>
+                            {% for year in academic_years %}
+                                <option value="{{ year.id }}">{{ year.year }} - {{ year.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" name="start_date" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">End Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" name="end_date" required>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="is_active" id="term_active" checked>
+                        <label class="form-check-label" for="term_active">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Create Term</button>
                 </div>
             </form>
         </div>
@@ -611,6 +831,85 @@
 </div>
 {% endfor %}
 
+<!-- Term Edit/Delete Modals -->
+{% for term in terms %}
+<!-- Edit Term Modal -->
+<div class="modal fade" id="editTermModal{{ term.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="fas fa-edit"></i> Edit Term</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:term_edit' term.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Term</label>
+                        <select class="form-select" name="term_number" required>
+                            {% for code, name in term.TERM_CHOICES %}
+                                <option value="{{ code }}" {% if term.term_number == code %}selected{% endif %}>{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-control" name="name" value="{{ term.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Academic Year</label>
+                        <select class="form-select" name="academic_year" required>
+                            {% for year in academic_years %}
+                                <option value="{{ year.id }}" {% if term.academic_year.id == year.id %}selected{% endif %}>{{ year.year }} - {{ year.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Start Date</label>
+                        <input type="date" class="form-control" name="start_date" value="{{ term.start_date|date:'Y-m-d' }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">End Date</label>
+                        <input type="date" class="form-control" name="end_date" value="{{ term.end_date|date:'Y-m-d' }}" required>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="is_active" {% if term.is_active %}checked{% endif %}>
+                        <label class="form-check-label">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Term Modal -->
+<div class="modal fade" id="deleteTermModal{{ term.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-trash"></i> Delete Term</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:term_delete' term.id %}">
+                {% csrf_token %}
+                <div class="modal-body text-center">
+                    <i class="fas fa-exclamation-triangle text-danger" style="font-size: 48px;"></i>
+                    <p class="mt-3">Delete <strong>{{ term.get_term_number_display }} - {{ term.academic_year.year }}</strong>?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
 <!-- Grade Edit/Delete Modals -->
 {% for grade in grade_levels %}
 <div class="modal fade" id="editGradeModal{{ grade.id }}" tabindex="-1">
@@ -623,6 +922,16 @@
             <form method="post" action="{% url 'school:grade_level_edit' grade.id %}">
                 {% csrf_token %}
                 <div class="modal-body">
+                    <div class="alert alert-info">
+                        <strong>{{ grade.name }} assignments</strong>
+                        <div class="small mt-1">
+                            {{ grade.students.count }} student{{ grade.students.count|pluralize }},
+                            {{ grade.streams.count }} stream{{ grade.streams.count|pluralize }},
+                            {{ grade.classteacher_set.count }} class teacher{{ grade.classteacher_set.count|pluralize }},
+                            {{ grade.teacherassignment_set.count }} teacher assignment{{ grade.teacherassignment_set.count|pluralize }}.
+                        </div>
+                        <div class="small mt-1">Renaming this grade keeps existing student and teacher allocations.</div>
+                    </div>
                     <div class="mb-3">
                         <label class="form-label">Curriculum</label>
                         <select class="form-select" name="curriculum">
@@ -651,6 +960,32 @@
                         <input type="number" class="form-control" name="order" value="{{ grade.order }}">
                     </div>
                     <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="reallocate_students">
+                        <label class="form-check-label">Reallocate students to a different grade/stream</label>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Destination Grade</label>
+                        <select class="form-select" name="target_grade">
+                            <option value="">Select destination grade</option>
+                            {% for target_grade in grade_levels %}
+                                {% if target_grade.id != grade.id %}
+                                    <option value="{{ target_grade.id }}">{{ target_grade.name }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Destination Stream</label>
+                        <select class="form-select" name="target_stream">
+                            <option value="">Select destination stream</option>
+                            {% for target_stream in streams %}
+                                {% if target_stream.grade_level.id != grade.id %}
+                                    <option value="{{ target_stream.id }}">{{ target_stream.grade_level.name }} - {{ target_stream.name }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" name="is_active" {% if grade.is_active %}checked{% endif %}>
                         <label class="form-check-label">Active</label>
                     </div>
@@ -673,9 +1008,39 @@
             </div>
             <form method="post" action="{% url 'school:grade_level_delete' grade.id %}">
                 {% csrf_token %}
-                <div class="modal-body text-center">
-                    <i class="fas fa-exclamation-triangle text-danger" style="font-size: 48px;"></i>
-                    <p class="mt-3">Delete <strong>{{ grade.name }}</strong>?</p>
+                <div class="modal-body">
+                    <div class="alert alert-danger">
+                        <strong>Delete {{ grade.name }}?</strong>
+                        <div class="small mt-1">
+                            This affects {{ grade.students.count }} student{{ grade.students.count|pluralize }},
+                            {{ grade.streams.count }} stream{{ grade.streams.count|pluralize }},
+                            {{ grade.classteacher_set.count }} class teacher{{ grade.classteacher_set.count|pluralize }},
+                            and {{ grade.teacherassignment_set.count }} teacher assignment{{ grade.teacherassignment_set.count|pluralize }}.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Move affected students and teachers to grade <span class="text-danger">*</span></label>
+                        <select class="form-select grade-destination" name="target_grade" data-stream-target="gradeDeleteStream{{ grade.id }}" required>
+                            <option value="">Select destination grade</option>
+                            {% for target_grade in grade_levels %}
+                                {% if target_grade.id != grade.id %}
+                                    <option value="{{ target_grade.id }}">{{ target_grade.name }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Move them to stream <span class="text-danger">*</span></label>
+                        <select class="form-select" id="gradeDeleteStream{{ grade.id }}" name="target_stream" required>
+                            <option value="">Select destination stream</option>
+                            {% for target_stream in streams %}
+                                {% if target_stream.grade_level.id != grade.id %}
+                                    <option value="{{ target_stream.id }}" data-grade="{{ target_stream.grade_level.id }}">{{ target_stream.grade_level.name }} - {{ target_stream.name }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <p class="small text-muted mb-0">The operation is completed as one transaction and recorded in the audit log.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -699,6 +1064,15 @@
             <form method="post" action="{% url 'school:stream_edit' stream.id %}">
                 {% csrf_token %}
                 <div class="modal-body">
+                    <div class="alert alert-info">
+                        <strong>{{ stream.name }} assignments</strong>
+                        <div class="small mt-1">
+                            {{ stream.students.count }} student{{ stream.students.count|pluralize }},
+                            {{ stream.classteacher_set.count }} class teacher{{ stream.classteacher_set.count|pluralize }},
+                            {{ stream.teacherassignment_set.count }} teacher assignment{{ stream.teacherassignment_set.count|pluralize }}.
+                        </div>
+                        <div class="small mt-1">Changing the name or code keeps all allocations. Changing grade moves the stream and its assignments.</div>
+                    </div>
                     <div class="mb-3">
                         <label class="form-label">Grade Level</label>
                         <select class="form-select" name="grade_level">
@@ -718,6 +1092,21 @@
                     <div class="mb-3">
                         <label class="form-label">Capacity</label>
                         <input type="number" class="form-control" name="capacity" value="{{ stream.capacity }}">
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="reallocate_students">
+                        <label class="form-check-label">Reallocate students to a different stream</label>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Destination Stream</label>
+                        <select class="form-select" name="target_stream">
+                            <option value="">Select destination stream</option>
+                            {% for target_stream in streams %}
+                                {% if target_stream.id != stream.id %}
+                                    <option value="{{ target_stream.id }}">{{ target_stream.grade_level.name }} - {{ target_stream.name }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
                     </div>
                     <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" name="is_active" {% if stream.is_active %}checked{% endif %}>
@@ -742,9 +1131,27 @@
             </div>
             <form method="post" action="{% url 'school:stream_delete' stream.id %}">
                 {% csrf_token %}
-                <div class="modal-body text-center">
-                    <i class="fas fa-exclamation-triangle text-danger" style="font-size: 48px;"></i>
-                    <p class="mt-3">Delete <strong>{{ stream.name }}</strong>?</p>
+                <div class="modal-body">
+                    <div class="alert alert-danger">
+                        <strong>Delete {{ stream.name }}?</strong>
+                        <div class="small mt-1">
+                            This affects {{ stream.students.count }} student{{ stream.students.count|pluralize }},
+                            {{ stream.classteacher_set.count }} class teacher{{ stream.classteacher_set.count|pluralize }},
+                            and {{ stream.teacherassignment_set.count }} teacher assignment{{ stream.teacherassignment_set.count|pluralize }}.
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Move affected students and teachers to stream <span class="text-danger">*</span></label>
+                        <select class="form-select" name="target_stream" required>
+                            <option value="">Select destination stream</option>
+                            {% for target_stream in streams %}
+                                {% if target_stream.id != stream.id %}
+                                    <option value="{{ target_stream.id }}">{{ target_stream.grade_level.name }} - {{ target_stream.name }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <p class="small text-muted mb-0">The operation is completed as one transaction and recorded in the audit log.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -832,5 +1239,86 @@
     </div>
 </div>
 {% endfor %}
+
+{% for curriculum in curriculums %}
+<!-- Edit Curriculum Modal -->
+<div class="modal fade" id="editCurriculumModal{{ curriculum.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="fas fa-edit"></i> Edit Curriculum</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:curriculum_edit' curriculum.id %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" value="{{ curriculum.name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="2">{{ curriculum.description|default:"" }}</textarea>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" name="is_active" {% if curriculum.is_active %}checked{% endif %}>
+                        <label class="form-check-label">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-dark">Update</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Curriculum Modal -->
+<div class="modal fade" id="deleteCurriculumModal{{ curriculum.id }}" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-trash"></i> Delete Curriculum</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="{% url 'school:curriculum_delete' curriculum.id %}">
+                {% csrf_token %}
+                <div class="modal-body text-center">
+                    <i class="fas fa-exclamation-triangle text-danger" style="font-size: 48px;"></i>
+                    <p class="mt-3">Delete <strong>{{ curriculum.name }}</strong>?</p>
+                    <small class="text-muted">This curriculum is in use by grade levels and subjects.</small>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.grade-destination').forEach(function (gradeSelect) {
+        const streamSelect = document.getElementById(gradeSelect.dataset.streamTarget);
+        if (!streamSelect) return;
+        const options = Array.from(streamSelect.options).slice(1);
+
+        function filterStreams() {
+            options.forEach(function (option) {
+                option.hidden = Boolean(option.value && option.dataset.grade !== gradeSelect.value);
+            });
+            if (streamSelect.selectedOptions[0] && streamSelect.selectedOptions[0].hidden) {
+                streamSelect.value = '';
+            }
+        }
+
+        gradeSelect.addEventListener('change', filterStreams);
+        filterStreams();
+    });
+});
+</script>
 
 {% endblock %}

@@ -13,6 +13,7 @@ urlpatterns = [
     path('assignments/<int:assignment_id>/delete/', views.teacher_assignment_delete, name='assignment_delete'),
     path('requests/', views.teacher_requests, name='requests'),
     path('requests/create/', views.teacher_request_create, name='request_create'),
+    path('my-status/', views.my_status, name='my_status'),
     path('api/search/', views.api_teachers_search, name='api_search'),
     
     # Class Teacher URLs

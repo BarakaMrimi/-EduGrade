@@ -8,83 +8,92 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="fas fa-edit"></i> Mark Entry</h2>
         <div>
-            <a href="{% url 'marks:view' %}?exam_id={{ exam_id }}&grade_level_id={{ grade_level_id }}&stream_id={{ stream_id }}" 
+            <a href="{% url 'marks:view' %}?exam_id={{ selected_exam.id|default:'' }}&grade_level_id={{ selected_grade.id|default:'' }}&stream_id={{ selected_stream.id|default:'' }}"
                class="btn btn-info">
                 <i class="fas fa-eye"></i> View Marks
             </a>
         </div>
     </div>
-    
-    <!-- Filters -->
+
+    <!-- Assignment Card -->
     <div class="card shadow mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-chalkboard-teacher"></i> Select Class & Subject</h5>
+        </div>
         <div class="card-body">
-            <form method="get" class="row g-3">
-                <div class="col-md-3">
-                    <label for="exam_id" class="form-label">Examination</label>
-                    <select class="form-select" id="exam_id" name="exam_id" required>
-                        <option value="">Select Examination</option>
-                        {% for exam in available_exams %}
-                            <option value="{{ exam.id }}" {% if exam.id == selected_exam.id %}selected{% endif %}>
-                                {{ exam.name }} ({{ exam.academic_year.year }})
-                            </option>
-                        {% endfor %}
-                    </select>
+            <form method="get" id="markFilterForm">
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Examination</label>
+                        <select class="form-select" name="exam_id" id="examSelect" required>
+                            <option value="">Select Examination</option>
+                            {% for exam in available_exams %}
+                                <option value="{{ exam.id }}" {% if exam.id == selected_exam.id|add:0 %}selected{% endif %}>
+                                    {{ exam.name }} ({{ exam.academic_year.year }})
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Subject / Class</label>
+                        <select class="form-select" name="subject_id" id="subjectSelect" required>
+                            <option value="">{% if assignments.count == 1 %}Subject{% else %}Select{% endif %}</option>
+                            {% for assignment in assignments %}
+                                <option value="{{ assignment.subject.id }}" data-grade="{{ assignment.grade_level.id }}" data-stream="{{ assignment.stream.id }}" {% if assignment.subject.id == subject_id|add:0 %}selected{% endif %}>
+                                    {{ assignment.subject.name }} — {{ assignment.grade_level.name }} {{ assignment.stream.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Class</label>
+                        <select class="form-select" name="grade_level_id" id="gradeSelect" required>
+                            <option value="">Select Grade</option>
+                            {% for assignment in assignments %}
+                                <option value="{{ assignment.grade_level.id }}" {% if assignment.grade_level.id == grade_level_id|add:0 %}selected{% endif %}>
+                                    {{ assignment.grade_level.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Stream</label>
+                        <select class="form-select" name="stream_id" id="streamSelect" required>
+                            <option value="">Select Stream</option>
+                            {% for assignment in assignments %}
+                                <option value="{{ assignment.stream.id }}" {% if assignment.stream.id == stream_id|add:0 %}selected{% endif %}>
+                                    {{ assignment.stream.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
                 </div>
-                <div class="col-md-2">
-                    <label for="subject_id" class="form-label">Subject</label>
-                    <select class="form-select" id="subject_id" name="subject_id" required>
-                        <option value="">Select Subject</option>
-                        {% for assignment in assignments %}
-                            <option value="{{ assignment.subject.id }}" {% if assignment.subject.id == subject_id|add:0 %}selected{% endif %}>
-                                {{ assignment.subject.name }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label for="grade_level_id" class="form-label">Grade</label>
-                    <select class="form-select" id="grade_level_id" name="grade_level_id" required>
-                        <option value="">Select Grade</option>
-                        {% for assignment in assignments %}
-                            <option value="{{ assignment.grade_level.id }}" {% if assignment.grade_level.id == grade_level_id|add:0 %}selected{% endif %}>
-                                {{ assignment.grade_level.name }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-2">
-                    <label for="stream_id" class="form-label">Stream</label>
-                    <select class="form-select" id="stream_id" name="stream_id" required>
-                        <option value="">Select Stream</option>
-                        {% for assignment in assignments %}
-                            <option value="{{ assignment.stream.id }}" {% if assignment.stream.id == stream_id|add:0 %}selected{% endif %}>
-                                {{ assignment.stream.name }}
-                            </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="col-md-3 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary w-100">
+                <div class="text-center mt-3">
+                    <button type="submit" class="btn btn-primary btn-lg w-100">
                         <i class="fas fa-search"></i> Load Students
                     </button>
                 </div>
             </form>
         </div>
     </div>
-    
+
     {% if students %}
-    <!-- Mark Entry Form -->
+    <!-- Student List with Mark Entry -->
     <div class="card shadow">
-        <div class="card-header bg-success text-white">
+        <div class="card-header d-flex justify-content-between align-items-center bg-success text-white">
             <h5 class="mb-0">
-                <i class="fas fa-users"></i> 
-                {{ selected_exam.name }} - {{ selected_subject.name }}
+                <i class="fas fa-users"></i>
+                {{ selected_exam.name }} — {{ selected_subject.name }}
                 ({{ selected_grade.name }} {{ selected_stream.name }})
-                <span class="badge bg-light text-dark float-end">{{ students|length }} Students</span>
             </h5>
+            <span class="badge bg-light text-dark">{{ students|length }} Students</span>
         </div>
         <div class="card-body">
-            <form method="post">
+            <div class="input-group mb-3">
+                <span class="input-group-text"><i class="fas fa-search"></i></span>
+                <input type="text" class="form-control" id="studentSearch" placeholder="Search students by name or admission number...">
+            </div>
+            <form method="post" id="markForm">
                 {% csrf_token %}
                 <input type="hidden" name="exam_id" value="{{ exam_id }}">
                 <input type="hidden" name="subject_id" value="{{ subject_id }}">
@@ -92,89 +101,133 @@
                 <input type="hidden" name="stream_id" value="{{ stream_id }}">
                 
                 <div class="table-responsive">
-                    <table class="table table-hover">
+                    <table class="table table-hover table-striped" id="studentTable">
                         <thead>
                             <tr>
-                                <th>#</th>
-                                <th>Admission No.</th>
-                                <th>Student Name</th>
-                                <th>Score (0-100)</th>
-                                <th>Status</th>
+                                <th style="width:5%">#</th>
+                                <th style="width:12%">Admission</th>
+                                <th style="width:25%">Student</th>
+                                <th style="width:15%">Score</th>
+                                <th style="width:12%">Status</th>
+                                <th style="width:8%">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for student in students %}
-                            <tr>
+                            <tr data-name="{{ student.full_name|lower }}" data-admission="{{ student.admission_number|lower }}">
                                 <td>{{ forloop.counter }}</td>
-                                <td><strong>{{ student.admission_number }}</strong></td>
-                                <td>{{ student.full_name }}</td>
+                                <td><small class="text-muted">{{ student.admission_number }}</small></td>
                                 <td>
-                                    <input type="number" 
-                                           class="form-control" 
-                                           name="mark_{{ student.id }}" 
-                                           id="mark_{{ student.id }}"
-                                           value="{{ student.mark.score|default:'' }}"
-                                           min="0" max="100" step="0.5"
-                                           placeholder="Enter mark">
+                                    <strong>{{ student.full_name }}</strong>
+                                    <br><small class="text-muted">{{ student.current_grade_level.name }} {{ student.current_stream.name }}</small>
                                 </td>
                                 <td>
-                                    <select class="form-select" name="status_{{ student.id }}">
-                                        <option value="DRAFT" {% if student.mark.status == 'DRAFT' %}selected{% endif %}>Draft</option>
+                                    <input type="number"
+                                           class="form-control form-control-sm mark-input"
+                                           name="mark_{{ student.id }}"
+                                           value="{{ student.mark.score|default:'' }}"
+                                           min="0" max="100" step="0.5"
+                                           placeholder="—"
+                                           data-student="{{ student.full_name }}">
+                                </td>
+                                <td>
+                                    <select class="form-select form-select-sm" name="status_{{ student.id }}">
+                                        <option value="DRAFT" {% if student.mark.status == 'DRAFT' or not student.mark %}selected{% endif %}>Draft</option>
                                         <option value="SUBMITTED" {% if student.mark.status == 'SUBMITTED' %}selected{% endif %}>Submitted</option>
                                     </select>
                                 </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="5" class="text-center text-muted">No students found in this class</td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-outline-info fill-demo" data-student="{{ student.full_name }}" title="Fill sample mark">
+                                        <i class="fas fa-fill"></i>
+                                    </button>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
                 
-                <div class="text-center mt-3">
-                    <button type="submit" class="btn btn-success btn-lg">
-                        <i class="fas fa-save"></i> Save Marks
-                    </button>
-                    <button type="reset" class="btn btn-secondary btn-lg">
-                        <i class="fas fa-undo"></i> Reset
-                    </button>
+                <div class="d-flex justify-content-between align-items-center mt-3">
+                    <div class="text-muted"><small>Enter marks and click Save</small></div>
+                    <div>
+                        <button type="button" class="btn btn-secondary btn-sm" id="fillAllBtn">
+                            <i class="fas fa-magic"></i> Fill Sample
+                        </button>
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="fas fa-save"></i> Save Marks
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>
     </div>
     {% elif exam_id and subject_id and grade_level_id and stream_id %}
     <div class="alert alert-info">
-        <i class="fas fa-info-circle"></i> No students found. Please check your selection.
+        <i class="fas fa-info-circle"></i> No students found in this class. Please check your selection.
+    </div>
+    {% elif not assignments %}
+    <div class="alert alert-warning">
+        <i class="fas fa-exclamation-triangle"></i>
+        {% if teacher %}
+            You have no approved assignments. Request a class or subject assignment from an administrator.
+            <a href="{% url 'teachers:request_create' %}" class="btn btn-warning btn-sm ms-2">Request Assignment</a>
+        {% else %}
+            You do not have a teacher profile. Contact the administrator.
+        {% endif %}
     </div>
     {% endif %}
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block extrajs %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Auto-save marks when entering
-        const markInputs = document.querySelectorAll('input[type="number"]');
-        markInputs.forEach(input => {
-            input.addEventListener('change', function() {
-                const val = parseFloat(this.value);
-                if (val < 0) this.value = 0;
-                if (val > 100) this.value = 100;
-                if (this.value) {
-                    const statusSelect = this.closest('tr').querySelector('select');
-                    if (statusSelect && statusSelect.value === 'DRAFT') {
-                        statusSelect.value = 'DRAFT';
-                    }
+document.addEventListener('DOMContentLoaded', function() {
+    // Search students
+    const searchInput = document.getElementById('studentSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase();
+            const rows = document.querySelectorAll('#studentTable tbody tr');
+            rows.forEach(row => {
+                const name = row.getAttribute('data-name');
+                const adm = row.getAttribute('data-admission');
+                if (name.includes(query) || adm.includes(query)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
                 }
             });
         });
-        
-        // Load subjects based on exam
-        document.getElementById('exam_id').addEventListener('change', function() {
-            // You can implement dynamic subject loading here
+    }
+
+    // Validate mark inputs
+    const markInputs = document.querySelectorAll('.mark-input');
+    markInputs.forEach(input => {
+        input.addEventListener('input', function() {
+            const val = parseFloat(this.value);
+            if (isNaN(val)) return;
+            if (val < 0) this.value = 0;
+            if (val > 100) this.value = 100;
         });
     });
+
+    // Fill sample marks
+    document.getElementById('fillAllBtn').addEventListener('click', function() {
+        if (!confirm('Fill all empty fields with sample mark 75?')) return;
+        document.querySelectorAll('.mark-input').forEach(input => {
+            if (!input.value) input.value = '75';
+        });
+    });
+
+    // Auto-load when assignment selected (single assignment)
+    const subjectSelect = document.getElementById('subjectSelect');
+    if (subjectSelect && subjectSelect.options.length === 2) { // only placeholder + 1 option
+        // Auto-submit if already has exam selected
+        const examSelect = document.getElementById('examSelect');
+        if (examSelect && examSelect.value) {
+            // Uncomment to auto-submit: document.getElementById('markFilterForm').submit();
+        }
+    }
+});
 </script>
 {% endblock %}

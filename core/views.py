@@ -3,12 +3,13 @@ from django.contrib.auth.decorators import login_required
 from django.views.generic import TemplateView
 from django.http import JsonResponse
 from django.contrib import messages
+from django.db.models import Q
 from students.models import Student
 from teachers.models import TeacherProfile
 from teachers.models import ClassTeacher
 from examinations.models import Examination
 from marks.models import MarkEntry
-from core.access import is_admin, permitted_student_queryset, class_teacher_assignments
+from core.access import is_admin, class_teacher_assignments
 from core.models import Notification
 
 try:
@@ -20,10 +21,40 @@ except ImportError:
 
 @login_required
 def dashboard(request):
-    scoped_students = permitted_student_queryset(request.user)
-    total_students = scoped_students.count()
-    students_844 = scoped_students.filter(curriculum__code='844').count()
-    students_cbc = scoped_students.filter(curriculum__code='CBC').count()
+    is_admin_user = is_admin(request.user)
+    pending_requests = 0
+    
+    if is_admin_user:
+        scoped_students = Student.objects.all()
+        total_students = scoped_students.count()
+        students_844 = scoped_students.filter(curriculum__code='844').count()
+        students_cbc = scoped_students.filter(curriculum__code='CBC').count()
+        show_request_button = False
+        teacher_assignments = None
+        teacher_profile = None
+    else:
+        teacher_profile = TeacherProfile.objects.filter(user=request.user).first()
+        # Get teacher's approved assignments
+        try:
+            teacher_assignments = teacher_profile.assignments.filter(status='APPROVED').select_related('subject', 'grade_level', 'stream', 'academic_year')
+        except Exception:
+            teacher_assignments = None
+        
+        # Get students from approved assignments - match grade+stream pairs
+        scoped_students = Student.objects.none()
+        assignment_pairs = teacher_assignments.values_list('grade_level', 'stream').distinct()
+        if assignment_pairs:
+            from django.db.models import Q
+            q_objects = Q()
+            for grade_id, stream_id in assignment_pairs:
+                q_objects |= Q(current_grade_level_id=grade_id, current_stream_id=stream_id)
+            scoped_students = Student.objects.filter(q_objects, is_active=True).distinct()
+        
+        total_students = scoped_students.count()
+        students_844 = scoped_students.filter(curriculum__code='844').count()
+        students_cbc = scoped_students.filter(curriculum__code='CBC').count()
+        show_request_button = teacher_assignments.count() == 0 and teacher_profile is not None
+        pending_requests = teacher_profile.requests.filter(status='PENDING').count() if teacher_profile else 0
     
     total_teachers = TeacherProfile.objects.count()
     active_teachers = TeacherProfile.objects.filter(status='ACTIVE', is_active=True).count()
@@ -56,6 +87,10 @@ def dashboard(request):
         'recent_students': recent_students,
         'recent_exams': recent_exams,
         'unread_notifications': unread_notification_count(request.user),
+        'show_request_button': show_request_button,
+        'teacher_profile': teacher_profile,
+        'teacher_assignments': teacher_assignments,
+        'pending_requests': pending_requests,
         **cbc_analysis,
     }
     return render(request, 'core/dashboard.html', context)
@@ -81,26 +116,48 @@ def build_cbc_analysis(request):
         return empty
 
     from students.models import Student
+    from teachers.models import TeacherProfile, ClassTeacher, TeacherAssignment
 
     students = Student.objects.filter(is_active=True)
     scope_label = 'School-wide CBC overview'
     scope_type = 'school'
     if not is_admin(request.user):
         teacher = TeacherProfile.objects.filter(user=request.user).first()
-        class_teacher = ClassTeacher.objects.filter(
-            teacher=teacher, is_active=True
-        ).select_related('grade_level', 'stream').order_by('-academic_year__year').first() if teacher else None
-        if class_teacher:
-            students = students.filter(
-                current_grade_level=class_teacher.grade_level,
-                current_stream=class_teacher.stream,
-            )
-            scope_type = 'class'
-            scope_label = f'{class_teacher.grade_level.name} {class_teacher.stream.name} CBC overview'
-        else:
+        if not teacher:
             students = students.none()
             scope_type = 'restricted'
-            scope_label = 'No assigned class CBC overview'
+            scope_label = 'No teacher profile found'
+        else:
+            scope = Q()
+
+            # Class teacher scope (grade + stream + academic year)
+            for assignment in ClassTeacher.objects.filter(
+                teacher=teacher, is_active=True
+            ).select_related('grade_level', 'stream').order_by('-academic_year__year'):
+                scope |= Q(
+                    current_grade_level=assignment.grade_level,
+                    current_stream=assignment.stream,
+                    academic_year=assignment.academic_year,
+                )
+
+            # Subject teacher scope (grade + stream + academic year via assignments)
+            for assignment in teacher.assignments.filter(
+                status='APPROVED'
+            ).select_related('grade_level', 'stream', 'academic_year'):
+                scope |= Q(
+                    current_grade_level=assignment.grade_level,
+                    current_stream=assignment.stream,
+                    academic_year=assignment.academic_year,
+                )
+
+            if scope:
+                students = students.filter(scope).distinct()
+                scope_type = 'class'
+                scope_label = 'Your assigned classes CBC overview'
+            else:
+                students = students.none()
+                scope_type = 'restricted'
+                scope_label = 'No assigned class CBC overview'
 
     latest_exam = Examination.objects.filter(
         curriculum__code='CBC',

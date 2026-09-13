@@ -202,11 +202,20 @@ def mark_view(request):
     exam_id = request.GET.get('exam_id')
     grade_level_id = request.GET.get('grade_level_id')
     stream_id = request.GET.get('stream_id')
-    
+
+    try:
+        exam_id = int(exam_id) if exam_id else None
+        grade_level_id = int(grade_level_id) if grade_level_id else None
+        stream_id = int(stream_id) if stream_id else None
+    except (ValueError, TypeError):
+        exam_id = None
+        grade_level_id = None
+        stream_id = None
+
     if not all([exam_id, grade_level_id, stream_id]):
         messages.error(request, 'Please select examination, grade, and stream.')
         return redirect('marks:entry')
-    
+
     exam = get_object_or_404(Examination, id=exam_id)
     grade_level = get_object_or_404(GradeLevel, id=grade_level_id)
     stream = get_object_or_404(Stream, id=stream_id)

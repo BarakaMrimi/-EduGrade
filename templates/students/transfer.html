@@ -45,7 +45,7 @@
                             <select class="form-select" id="stream" name="stream" required>
                                 <option value="">Select Stream</option>
                                 {% for stream in streams %}
-                                    <option value="{{ stream.id }}">{{ stream.name }}</option>
+                                    <option value="{{ stream.id }}" {% if student.current_stream_id == stream.id %}selected{% endif %} data-grade="{{ stream.grade_level_id }}">{{ stream.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -62,4 +62,38 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const gradeSelect = document.getElementById('grade_level');
+  const streamSelect = document.getElementById('stream');
+  if (!gradeSelect || !streamSelect) return;
+
+  const streamOptions = Array.from(streamSelect.options).slice(1);
+
+  function filterStreams() {
+    const selectedGrade = gradeSelect.value;
+    streamOptions.forEach(opt => {
+      if (!selectedGrade || opt.dataset.grade === selectedGrade) {
+        opt.style.display = '';
+      } else {
+        opt.style.display = 'none';
+      }
+    });
+    // Reset stream select if current value is hidden
+    if (streamSelect.value) {
+      const selectedOpt = streamSelect.options[streamSelect.selectedIndex];
+      if (selectedOpt.style.display === 'none') {
+        streamSelect.value = '';
+      }
+    }
+  }
+
+  gradeSelect.addEventListener('change', filterStreams);
+  // Initial filter
+  filterStreams();
+});
+</script>
 {% endblock %}

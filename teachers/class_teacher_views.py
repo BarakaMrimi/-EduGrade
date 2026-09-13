@@ -231,6 +231,29 @@ def class_teacher_request_create(request):
             duration_days=duration_days,
             status='PENDING',
         )
+        
+        # Notify admins about new request
+        from django.contrib.auth import get_user_model
+        admins = get_user_model().objects.filter(is_staff=True, is_active=True)
+        for admin in admins:
+            send_notification(
+                admin,
+                title="New Class Teacher Request",
+                message=(
+                    f"{teacher.full_name} has submitted a {req.get_request_type_display()} request.\n\n"
+                    f"Grade: {req.grade_level.name if req.grade_level else 'N/A'}\n"
+                    f"Stream: {req.stream.name if req.stream else 'N/A'}\n"
+                    f"Subject: {req.subject.name if req.subject else 'N/A'}\n"
+                    f"Academic Year: {req.academic_year.year if req.academic_year else 'N/A'}\n\n"
+                    f"Reason: {reason}\n\n"
+                    f"Please review and approve or reject this request."
+                ),
+                notification_type="APPROVAL_REQUEST",
+                url="/teachers/class-teachers/requests/",
+                related_object_id=str(req.id),
+                related_object_type="ClassTeacherRequest",
+            )
+        
         messages.success(request, f'Request #{req.id} submitted. Waiting for admin approval.')
         return redirect('class_teachers:request_list')
 

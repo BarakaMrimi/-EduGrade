@@ -2,16 +2,19 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
-from django.db.models import Q
+from django.db.models import Avg, Count, Q
 from django.core.paginator import Paginator
-from django.contrib.auth.models import User
-from django.db import IntegrityError
+from django.db import transaction
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 from datetime import datetime
 from .models import TeacherProfile, TeacherAssignment, TeacherRequest, ClassTeacher, ClassTeacherRequest
 from school.models import Subject, GradeLevel, Stream, AcademicYear, Curriculum
+from marks.models import MarkEntry, MarkSubmission
+from students.models import Student, StudentHistory
 from core.permissions import Permission
-from core.access import has_permission, is_admin, send_notification, notify_warning, notify_suspension
+from core.models import Notification, PermissionAssignment, PermissionCode, Role, UserProfile
+from core.access import has_permission, is_admin, send_notification, notify_warning, notify_suspension, notify_request_result
 
 
 def _is_admin(user):
@@ -58,6 +61,8 @@ def teacher_list(request):
 @login_required
 def teacher_detail(request, teacher_id):
     """View teacher details — admin can view all, teachers can view their own."""
+    from core.models import Role, UserProfile, SuspensionRecord, WarningRecord
+    
     teacher = get_object_or_404(TeacherProfile, id=teacher_id)
     is_admin = _is_admin(request.user)
     
@@ -299,16 +304,13 @@ def teacher_assign(request, teacher_id):
 @login_required
 def teacher_requests(request):
     """View and manage teacher requests"""
-    # Check if user is admin or teacher
     is_admin = request.user.is_staff or request.user.is_superuser
     
     if is_admin:
-        # Admin sees all requests
         requests_list = TeacherRequest.objects.select_related(
             'teacher', 'subject', 'grade_level', 'stream', 'academic_year'
         ).all()
     else:
-        # Teacher sees only their own requests
         try:
             teacher_profile = TeacherProfile.objects.get(user=request.user)
             requests_list = TeacherRequest.objects.filter(teacher=teacher_profile).select_related(
@@ -317,66 +319,48 @@ def teacher_requests(request):
         except TeacherProfile.DoesNotExist:
             requests_list = TeacherRequest.objects.none()
     
-    # Handle request actions (admin only)
     if request.method == 'POST' and is_admin:
         request_id = request.POST.get('request_id')
         action = request.POST.get('action')
-        admin_notes = request.POST.get('admin_notes', '')
-        
-        teacher_request = get_object_or_404(TeacherRequest, id=request_id)
-        
-        if action == 'approve':
-            teacher_request.status = 'APPROVED'
-            teacher_request.reviewed_by = request.user
-            teacher_request.reviewed_date = timezone.now()
-            teacher_request.admin_notes = admin_notes
+        admin_notes = request.POST.get('admin_notes', '').strip()
 
-            if teacher_request.request_type == 'REMOVE':
-                TeacherAssignment.objects.filter(
-                    teacher=teacher_request.teacher,
-                    subject=teacher_request.subject,
-                    grade_level=teacher_request.grade_level,
-                    stream=teacher_request.stream,
-                    academic_year=teacher_request.academic_year,
-                ).delete()
-                messages.success(request, f'Assignment removed for {teacher_request.teacher.full_name}')
-            elif not all([teacher_request.subject, teacher_request.grade_level, teacher_request.stream, teacher_request.academic_year]):
-                teacher_request.status = 'REJECTED'
-                teacher_request.admin_notes = 'Request is missing subject, grade, stream, or academic year.'
-                messages.error(request, 'Request could not be approved because required assignment details are missing.')
-            else:
-                curriculum = teacher_request.grade_level.curriculum or teacher_request.subject.curriculum
-                try:
-                    TeacherAssignment.objects.get_or_create(
-                        teacher=teacher_request.teacher,
-                        subject=teacher_request.subject,
-                        grade_level=teacher_request.grade_level,
-                        stream=teacher_request.stream,
-                        academic_year=teacher_request.academic_year,
-                        defaults={
-                            'curriculum': curriculum,
-                            'status': 'APPROVED',
-                            'approved_by': request.user,
-                            'approved_date': datetime.now().date(),
-                        },
+        teacher_request = get_object_or_404(TeacherRequest, id=request_id)
+
+        if action in ('approve', 'reapprove'):
+            try:
+                with transaction.atomic():
+                    teacher_request.reviewed_by = request.user
+                    teacher_request.reviewed_date = timezone.now()
+                    teacher_request.admin_notes = admin_notes
+                    _execute_approval(teacher_request, request.user)
+                    teacher_request.status = 'APPROVED'
+                    teacher_request.save(
+                        update_fields=['status', 'reviewed_by', 'reviewed_date', 'admin_notes']
                     )
-                    messages.success(request, f'Request approved for {teacher_request.teacher.full_name}')
-                except IntegrityError:
-                    teacher_request.status = 'REJECTED'
-                    teacher_request.admin_notes = 'An identical assignment already exists or the request data is invalid.'
-                    messages.error(request, 'Request could not be approved because the assignment already exists or is invalid.')
-            
-        elif action == 'reject':
-            teacher_request.status = 'REJECTED'
-            teacher_request.reviewed_by = request.user
-            teacher_request.reviewed_date = timezone.now()
-            teacher_request.admin_notes = admin_notes
-            messages.warning(request, f'Request rejected for {teacher_request.teacher.full_name}')
-        
-        teacher_request.save()
+                notify_request_result(teacher_request, approved=True, admin_notes=admin_notes)
+                messages.success(request, f'Request approved for {teacher_request.teacher.full_name}!')
+            except ValidationError as exc:
+                messages.error(request, f'Request cannot be approved: {exc.message}')
+            except Exception as exc:
+                messages.error(request, f'Approval could not be completed: {exc}')
+            return redirect('teachers:requests')
+
+        if action == 'reject':
+            with transaction.atomic():
+                teacher_request.status = 'REJECTED'
+                teacher_request.reviewed_by = request.user
+                teacher_request.reviewed_date = timezone.now()
+                teacher_request.admin_notes = admin_notes
+                teacher_request.save(
+                    update_fields=['status', 'reviewed_by', 'reviewed_date', 'admin_notes']
+                )
+            notify_request_result(teacher_request, approved=False, admin_notes=admin_notes)
+            messages.warning(request, f'Request rejected for {teacher_request.teacher.full_name}!')
+            return redirect('teachers:requests')
+
+        messages.error(request, 'Unknown request action.')
         return redirect('teachers:requests')
     
-    # Filtering
     status_filter = request.GET.get('status', '')
     if status_filter:
         requests_list = requests_list.filter(status=status_filter)
@@ -387,6 +371,178 @@ def teacher_requests(request):
         'is_admin': is_admin,
     }
     return render(request, 'teachers/requests.html', context)
+
+
+def _get_or_create_permission(code):
+    label, description = Permission.LABELS.get(code, (code, ''))
+    permission, _ = PermissionCode.objects.get_or_create(
+        code=code,
+        defaults={'name': label, 'description': description, 'category': label.split()[0]},
+    )
+    return permission
+
+
+def _upsert_permission(profile, permission, granted_by, **scope):
+    assignment = PermissionAssignment.objects.filter(
+        profile=profile,
+        permission=permission,
+        **scope,
+    ).first()
+    if assignment:
+        assignment.is_active = True
+        assignment.expires_at = None
+        assignment.granted_by = granted_by
+        assignment.save(
+            update_fields=['is_active', 'expires_at', 'granted_by']
+        )
+        return assignment
+    return PermissionAssignment.objects.create(
+        profile=profile,
+        permission=permission,
+        granted_by=granted_by,
+        expires_at=None,
+        is_active=True,
+        **scope,
+    )
+
+
+def _grant_assignment_permissions(profile, teacher_request, granted_by):
+    scope = {
+        'grade_level': teacher_request.grade_level,
+        'stream': teacher_request.stream,
+        'academic_year': teacher_request.academic_year,
+    }
+    if teacher_request.role == 'class_teacher':
+        _upsert_permission(profile, _get_or_create_permission(Permission.ENTER_MARKS), granted_by, **scope)
+        _upsert_permission(profile, _get_or_create_permission(Permission.VIEW_STUDENT), granted_by, **scope)
+        _upsert_permission(profile, _get_or_create_permission(Permission.VIEW_CLASS_ANALYTICS), granted_by, **scope)
+        _upsert_permission(profile, _get_or_create_permission(Permission.GENERATE_REPORT), granted_by, **scope)
+        return
+
+    subject_scope = {'subject': teacher_request.subject, **scope}
+    _upsert_permission(profile, _get_or_create_permission(Permission.ENTER_MARKS), granted_by, **subject_scope)
+    _upsert_permission(profile, _get_or_create_permission(Permission.VIEW_STUDENT), granted_by, **scope)
+    _upsert_permission(profile, _get_or_create_permission(Permission.VIEW_SUBJECT_ANALYTICS), granted_by, **subject_scope)
+    _upsert_permission(profile, _get_or_create_permission(Permission.GENERATE_REPORT), granted_by, **scope)
+
+
+def _revoke_removed_permissions(profile, teacher_request):
+    permissions = PermissionAssignment.objects.filter(
+        profile=profile,
+        is_active=True,
+        grade_level=teacher_request.grade_level,
+        stream=teacher_request.stream,
+        academic_year=teacher_request.academic_year,
+    )
+    if teacher_request.role == 'teacher':
+        permissions = permissions.filter(subject=teacher_request.subject)
+    else:
+        permissions = permissions.filter(subject__isnull=True)
+    permissions.update(is_active=False)
+
+
+def _sync_effective_profile(teacher):
+    profile, _ = UserProfile.objects.get_or_create(user=teacher.user)
+    has_class_role = teacher.class_teacher_assignments.filter(is_active=True).exists()
+    has_subject_role = teacher.assignments.filter(status='APPROVED').exists()
+
+    if has_class_role:
+        role_name = 'CLASS_TEACHER'
+    elif has_subject_role or teacher.status == 'ACTIVE':
+        role_name = 'TEACHER'
+    else:
+        role_name = profile.role.name if profile.role_id else 'TEACHER'
+
+    role, _ = Role.objects.get_or_create(name=role_name)
+    profile.role = role
+    profile.is_active = teacher.is_active
+    profile.save(update_fields=['role', 'is_active', 'updated_at'])
+    return profile
+
+
+def _validate_removal_scope(teacher_request):
+    if not teacher_request.grade_level_id or not teacher_request.academic_year_id:
+        raise ValidationError('Grade/Form and Academic Year are required.')
+    if teacher_request.role == 'class_teacher':
+        if not teacher_request.stream_id:
+            raise ValidationError('Stream is required for a Class Teacher removal.')
+    elif not teacher_request.subject_id or not teacher_request.stream_id:
+        raise ValidationError('Subject and Stream are required for a Teacher removal.')
+
+
+def _execute_approval(teacher_request, granted_by):
+    if teacher_request.request_type == 'REMOVE':
+        _validate_removal_scope(teacher_request)
+        if teacher_request.role == 'class_teacher':
+            ClassTeacher.objects.filter(
+                teacher=teacher_request.teacher,
+                grade_level=teacher_request.grade_level,
+                stream=teacher_request.stream,
+                academic_year=teacher_request.academic_year,
+            ).delete()
+        else:
+            TeacherAssignment.objects.filter(
+                teacher=teacher_request.teacher,
+                subject=teacher_request.subject,
+                grade_level=teacher_request.grade_level,
+                stream=teacher_request.stream,
+                academic_year=teacher_request.academic_year,
+            ).delete()
+        profile, _ = UserProfile.objects.get_or_create(user=teacher_request.teacher.user)
+        _revoke_removed_permissions(profile, teacher_request)
+        _sync_effective_profile(teacher_request.teacher)
+        return
+
+    if not teacher_request.grade_level_id or not teacher_request.academic_year_id:
+        raise ValidationError('Grade/Form and Academic Year are required.')
+    if not teacher_request.stream_id:
+        raise ValidationError('Stream is required for this assignment.')
+
+    if teacher_request.role == 'class_teacher':
+        existing_class = ClassTeacher.objects.filter(
+            grade_level=teacher_request.grade_level,
+            stream=teacher_request.stream,
+            academic_year=teacher_request.academic_year,
+        ).first()
+        if existing_class and existing_class.teacher_id != teacher_request.teacher_id:
+            raise ValidationError('This class already has an active class teacher.')
+        ClassTeacher.objects.update_or_create(
+            teacher=teacher_request.teacher,
+            grade_level=teacher_request.grade_level,
+            stream=teacher_request.stream,
+            academic_year=teacher_request.academic_year,
+            defaults={'is_active': True},
+        )
+    else:
+        if not teacher_request.subject_id:
+            raise ValidationError('Subject is required for a Teacher assignment.')
+        curriculum = (
+            teacher_request.grade_level.curriculum
+            or teacher_request.subject.curriculum
+        )
+        if not curriculum:
+            raise ValidationError('A curriculum is required for this assignment.')
+        TeacherAssignment.objects.update_or_create(
+            teacher=teacher_request.teacher,
+            subject=teacher_request.subject,
+            grade_level=teacher_request.grade_level,
+            stream=teacher_request.stream,
+            academic_year=teacher_request.academic_year,
+            defaults={
+                'curriculum': curriculum,
+                'status': 'APPROVED',
+                'is_class_teacher': False,
+                'approved_by': granted_by,
+                'approved_date': timezone.now().date(),
+                'notes': teacher_request.reason,
+            },
+        )
+
+    teacher_request.teacher.status = 'ACTIVE'
+    teacher_request.teacher.is_active = True
+    teacher_request.teacher.save(update_fields=['status', 'is_active', 'updated_at'])
+    profile = _sync_effective_profile(teacher_request.teacher)
+    _grant_assignment_permissions(profile, teacher_request, granted_by)
 
 
 @login_required
@@ -400,40 +556,76 @@ def teacher_request_create(request):
         return redirect('core:dashboard')
     
     if request.method == 'POST':
+        role = request.POST.get('role', '').strip()
+        request_type = request.POST.get('request_type', '').strip()
+        subject_id = request.POST.get('subject', '').strip()
+        grade_level_id = request.POST.get('grade_level', '').strip()
+        stream_id = request.POST.get('stream', '').strip()
+        academic_year_id = request.POST.get('academic_year', '').strip()
+        reason = request.POST.get('reason', '').strip()
+
+        if not role or not request_type or not grade_level_id or not stream_id or not academic_year_id or not reason:
+            messages.error(request, 'Please fill in all required fields: Role, Request Type, Grade/Form, Stream, Academic Year, and Reason.')
+            return redirect('teachers:request_create')
+
+        if role not in dict(TeacherRequest.ROLES):
+            messages.error(request, 'Invalid role selected.')
+            return redirect('teachers:request_create')
+
+        if role == 'teacher' and not subject_id:
+            messages.error(request, 'Subject is required for Teacher role.')
+            return redirect('teachers:request_create')
+
         try:
-            # Get form data
-            request_type = request.POST.get('request_type')
-            subject_id = request.POST.get('subject')
-            grade_level_id = request.POST.get('grade_level')
-            stream_id = request.POST.get('stream')
-            academic_year_id = request.POST.get('academic_year')
-            reason = request.POST.get('reason')
-            
-            # Validate that all required fields are provided
-            if not all([request_type, subject_id, grade_level_id, stream_id, academic_year_id, reason]):
-                messages.error(request, 'All fields are required!')
-                return redirect('teachers:request_create')
-            
-            # Create the request
             teacher_request = TeacherRequest.objects.create(
                 teacher=teacher,
                 request_type=request_type,
-                subject_id=subject_id,
+                role=role,
+                subject_id=subject_id or None,
                 grade_level_id=grade_level_id,
-                stream_id=stream_id,
+                stream_id=stream_id or None,
                 academic_year_id=academic_year_id,
                 reason=reason,
                 status='PENDING'
             )
-            
+
+            role_label = 'Class Teacher' if role == 'class_teacher' else 'Teacher'
+
+            admin_message = (
+                f"{teacher.full_name} is requesting to serve as {role_label}.\n\n"
+                f"Request Type: {teacher_request.get_request_type_display()}\n"
+                f"Role: {role_label}\n"
+            )
+            if teacher_request.subject:
+                admin_message += f"Subject: {teacher_request.subject.name}\n"
+            admin_message += (
+                f"Grade/Form: {teacher_request.grade_level.name}\n"
+                f"Stream: {teacher_request.stream.name if teacher_request.stream else 'N/A'}\n"
+                f"Academic Year: {teacher_request.academic_year.year}\n\n"
+                f"Reason: {reason}\n\n"
+                f"Please review and approve or reject this request."
+            )
+
+            from django.contrib.auth import get_user_model
+            admins = get_user_model().objects.filter(is_staff=True, is_active=True)
+            for admin in admins:
+                send_notification(
+                    admin,
+                    title=f"New {role_label} Request",
+                    message=admin_message,
+                    notification_type="APPROVAL_REQUEST",
+                    url="/teachers/requests/",
+                    related_object_id=str(teacher_request.id),
+                    related_object_type="TeacherRequest",
+                )
+
             messages.success(request, 'Your request has been submitted successfully!')
             return redirect('teachers:requests')
-            
+
         except Exception as e:
             messages.error(request, f'Error submitting request: {str(e)}')
             return redirect('teachers:request_create')
-    
-    # GET request - show form
+
     context = {
         'teacher': teacher,
         'request_types': TeacherRequest.REQUEST_TYPES,
@@ -479,3 +671,167 @@ def teacher_request_approval(request):
         'is_pending': not teacher.is_active or teacher.status in ('INACTIVE', 'PENDING'),
     }
     return render(request, 'teachers/request_approval.html', context)
+
+
+@login_required
+def my_status(request):
+    admin_user = is_admin(request.user)
+    teacher = TeacherProfile.objects.select_related('user').filter(user=request.user).first()
+    user_profile = UserProfile.objects.select_related('role').filter(user=request.user).first()
+    if user_profile is None:
+        user_profile = UserProfile.objects.create(user=request.user)
+
+    if teacher:
+        all_assignments = TeacherAssignment.objects.filter(
+            teacher=teacher
+        ).select_related(
+            'subject', 'grade_level', 'stream', 'academic_year', 'curriculum', 'term', 'approved_by'
+        ).order_by('-academic_year__year', 'grade_level__order', 'subject__name')
+        approved_assignments = all_assignments.filter(status='APPROVED')
+        class_teacher_records = ClassTeacher.objects.filter(
+            teacher=teacher, is_active=True
+        ).select_related('grade_level', 'stream', 'academic_year').order_by('-academic_year__year')
+        requests = teacher.requests.select_related(
+            'subject', 'grade_level', 'stream', 'academic_year', 'reviewed_by'
+        ).order_by('-requested_date')
+        class_teacher_requests = teacher.class_teacher_requests.select_related(
+            'grade_level', 'stream', 'subject', 'academic_year', 'term', 'reviewed_by'
+        ).order_by('-requested_at')
+        mark_submissions = MarkSubmission.objects.filter(
+            teacher=teacher
+        ).select_related(
+            'examination', 'examination__academic_year', 'examination__term',
+            'subject', 'grade_level', 'stream', 'submitted_by', 'approved_by'
+        ).order_by('-submission_date')
+        scope_q = Q()
+        for assignment in approved_assignments:
+            scope_q |= Q(
+                current_grade_level_id=assignment.grade_level_id,
+                current_stream_id=assignment.stream_id,
+                academic_year_id=assignment.academic_year_id,
+            )
+        for class_assignment in class_teacher_records:
+            scope_q |= Q(
+                current_grade_level_id=class_assignment.grade_level_id,
+                current_stream_id=class_assignment.stream_id,
+                academic_year_id=class_assignment.academic_year_id,
+            )
+        has_scope = bool(scope_q.children)
+        if admin_user and not has_scope:
+            students_in_scope = Student.objects.filter(is_active=True)
+        elif has_scope:
+            students_in_scope = Student.objects.filter(scope_q, is_active=True)
+        else:
+            students_in_scope = Student.objects.none()
+        students_in_scope = students_in_scope.select_related(
+            'curriculum', 'current_grade_level', 'current_stream', 'academic_year'
+        ).distinct()
+
+        students_with_marks = Student.objects.filter(marks__entered_by=request.user)
+        if has_scope or admin_user:
+            students_with_marks = students_with_marks.filter(scope_q if has_scope else Q(pk__in=students_in_scope.values('pk')))
+        students_with_marks = students_with_marks.select_related(
+            'current_grade_level', 'current_stream', 'academic_year'
+        ).distinct()
+
+        student_progress = students_in_scope.annotate(
+            entered_mark_count=Count(
+                'marks', filter=Q(marks__entered_by=request.user), distinct=True
+            ),
+            average_score=Avg('marks__score', filter=Q(marks__entered_by=request.user)),
+        ).order_by('admission_number')
+
+        stream_progress = students_in_scope.values(
+            'current_grade_level_id', 'current_grade_level__name',
+            'current_stream_id', 'current_stream__name',
+            'academic_year_id', 'academic_year__year',
+        ).annotate(
+            enrolled_students=Count('id', distinct=True),
+            assessed_students=Count('marks__student_id', filter=Q(marks__isnull=False), distinct=True),
+            marks_entered=Count('marks', filter=Q(marks__entered_by=request.user)),
+            average_score=Avg('marks__score'),
+        ).order_by('-academic_year__year', 'current_grade_level__order', 'current_stream__name')
+
+        reenrolled_streams = StudentHistory.objects.filter(
+            student__in=students_in_scope,
+        ).exclude(is_current=True).select_related(
+            'student', 'student__current_grade_level', 'student__current_stream',
+            'academic_year', 'grade_level', 'stream'
+        ).order_by('-academic_year__year', '-created_at')[:20]
+
+        try:
+            from grading.models import StudentOverallKCSE, StudentOverallCBA
+            kcse_progress = StudentOverallKCSE.objects.filter(
+                student__in=students_in_scope
+            ).select_related('student', 'examination').order_by('-examination__start_date')[:20]
+            cbc_progress = StudentOverallCBA.objects.filter(
+                student__in=students_in_scope
+            ).select_related('student', 'examination', 'overall_level').order_by('-examination__start_date')[:20]
+        except Exception:
+            kcse_progress = StudentOverallKCSE.objects.none() if 'StudentOverallKCSE' in locals() else Student.objects.none()
+            cbc_progress = StudentOverallCBA.objects.none() if 'StudentOverallCBA' in locals() else Student.objects.none()
+    else:
+        all_assignments = TeacherAssignment.objects.none()
+        approved_assignments = TeacherAssignment.objects.none()
+        class_teacher_records = ClassTeacher.objects.none()
+        requests = TeacherRequest.objects.none()
+        class_teacher_requests = ClassTeacherRequest.objects.none()
+        mark_submissions = MarkSubmission.objects.none()
+        students_in_scope = Student.objects.filter(is_active=True) if admin_user else Student.objects.none()
+        students_with_marks = Student.objects.none()
+        student_progress = Student.objects.none()
+        stream_progress = Student.objects.none()
+        reenrolled_streams = StudentHistory.objects.none()
+        kcse_progress = Student.objects.none()
+        cbc_progress = Student.objects.none()
+
+    marks_entered = MarkEntry.objects.filter(
+        entered_by=request.user
+    ).select_related(
+        'student', 'student__current_grade_level', 'student__current_stream',
+        'examination', 'examination__academic_year', 'examination__term',
+        'subject', 'grade_level', 'stream'
+    ).order_by('-updated_at')
+    recent_marks_entered = marks_entered[:20]
+    total_marks_count = marks_entered.count()
+    active_permissions = user_profile.effective_permissions().select_related(
+        'permission', 'subject', 'grade_level', 'stream', 'academic_year', 'term', 'examination'
+    ).order_by('-granted_at')
+    notifications = request.user.notifications.all().order_by('-created_at')[:10]
+    mark_summary = marks_entered.aggregate(average_score=Avg('score'))
+    enrolled_students_count = students_in_scope.count()
+    assessed_students_count = students_with_marks.count()
+
+    context = {
+        'teacher': teacher,
+        'user_profile': user_profile,
+        'admin_user': admin_user,
+        'role_label': user_profile.role.get_name_display() if user_profile.role_id else ('Teacher' if teacher else 'No role assigned'),
+        'profile_status': teacher.get_status_display() if teacher else ('Active' if request.user.is_active else 'Inactive'),
+        'is_suspended': user_profile.is_suspended,
+        'all_assignments': all_assignments,
+        'approved_assignments': approved_assignments,
+        'active_assignments_count': approved_assignments.count(),
+        'class_teacher_records': class_teacher_records,
+        'is_class_teacher': class_teacher_records.exists(),
+        'requests': requests,
+        'pending_requests_count': requests.filter(status='PENDING').count() if teacher else 0,
+        'class_teacher_requests': class_teacher_requests,
+        'pending_class_teacher_requests_count': class_teacher_requests.filter(status='PENDING').count() if teacher else 0,
+        'students_in_scope': students_in_scope,
+        'students_with_marks': students_with_marks,
+        'student_progress': student_progress,
+        'stream_progress': stream_progress,
+        'reenrolled_streams': reenrolled_streams,
+        'marks_entered': recent_marks_entered,
+        'total_marks_count': total_marks_count,
+        'mark_submissions': mark_submissions,
+        'average_mark_score': mark_summary.get('average_score'),
+        'enrolled_students_count': enrolled_students_count,
+        'assessed_students_count': assessed_students_count,
+        'kcse_progress': kcse_progress,
+        'cbc_progress': cbc_progress,
+        'active_permissions': active_permissions,
+        'notifications': notifications,
+    }
+    return render(request, 'teachers/my_status.html', context)

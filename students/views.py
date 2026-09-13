@@ -2,13 +2,15 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
-from django.db.models import Q
+from django.db import transaction
+
 from django.core.paginator import Paginator
 from .models import Student, StudentHistory
 from school.models import AcademicYear, Curriculum, GradeLevel, Stream
 from django.contrib.auth.models import User
 from datetime import datetime
-from core.access import can_manage_student, can_use_class, permitted_student_queryset, can_edit_student
+from core.access import can_manage_student, can_use_class, permitted_student_queryset, can_edit_student, is_admin
+from core.models import AuditLog
 from teachers.models import ClassTeacher, TeacherProfile
 
 try:
@@ -23,6 +25,68 @@ except ImportError:
     StudentOverallKCSE = None
     StudentCBAAssessment = None
     StudentOverallCBA = None
+
+
+def _positive_id(value):
+    try:
+        value = int(value)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def _validate_placement(grade_level_id, stream_id, academic_year_id, curriculum_id=None):
+    grade_level_id = _positive_id(grade_level_id)
+    stream_id = _positive_id(stream_id)
+    academic_year_id = _positive_id(academic_year_id)
+    curriculum_id = _positive_id(curriculum_id) if curriculum_id is not None else None
+
+    grade_level = GradeLevel.objects.filter(id=grade_level_id, is_active=True).first() if grade_level_id else None
+    stream = Stream.objects.filter(id=stream_id, is_active=True).first() if stream_id else None
+    academic_year = AcademicYear.objects.filter(id=academic_year_id).first() if academic_year_id else None
+    curriculum = Curriculum.objects.filter(id=curriculum_id, is_active=True).first() if curriculum_id else None
+
+    if not grade_level or not stream or not academic_year:
+        return None, None, None, None, 'Select a valid grade, stream, and academic year.'
+    if stream.grade_level_id != grade_level.id:
+        return None, None, None, None, 'The selected stream does not belong to the selected grade.'
+    if curriculum_id is not None:
+        if not curriculum:
+            return None, None, None, None, 'Select a valid curriculum.'
+        if grade_level.curriculum_id != curriculum.id:
+            return None, None, None, None, 'The selected grade does not belong to the selected curriculum.'
+
+    return grade_level, stream, academic_year, curriculum, None
+
+
+def _record_current_placement(student, grade_level, stream, academic_year):
+    placement_changed = (
+        student.current_grade_level_id != grade_level.id
+        or student.current_stream_id != stream.id
+        or student.academic_year_id != academic_year.id
+    )
+    has_current_history = StudentHistory.objects.filter(student_id=student.id, is_current=True).exists()
+
+    if not placement_changed:
+        if not has_current_history:
+            StudentHistory.objects.create(
+                student_id=student.id,
+                grade_level_id=grade_level.id,
+                stream_id=stream.id,
+                academic_year_id=academic_year.id,
+                is_current=True,
+            )
+        return False
+
+    StudentHistory.objects.filter(student_id=student.id, is_current=True).update(is_current=False)
+    StudentHistory.objects.create(
+        student_id=student.id,
+        grade_level_id=grade_level.id,
+        stream_id=stream.id,
+        academic_year_id=academic_year.id,
+        is_current=True,
+    )
+    return True
 
 
 def _student_exam_history(student):
@@ -387,53 +451,94 @@ def student_edit(request, student_id):
         return redirect('students:detail', student_id=student.id)
     
     if request.method == 'POST':
-        try:
-            admission_number = request.POST.get('admission_number', '').strip()
-            if not admission_number:
-                messages.error(request, 'Admission number is required.')
-                return redirect('students:edit', student_id=student.id)
-            if Student.objects.filter(admission_number=admission_number).exclude(id=student.id).exists():
-                messages.error(request, f'Admission number {admission_number} is already in use.')
-                return redirect('students:edit', student_id=student.id)
-            student.admission_number = admission_number
-            # Update student fields
-            student.first_name = request.POST.get('first_name')
-            student.last_name = request.POST.get('last_name')
-            student.middle_name = request.POST.get('middle_name', '')
-            student.date_of_birth = request.POST.get('date_of_birth')
-            student.gender = request.POST.get('gender')
-            student.nationality = request.POST.get('nationality', 'Kenyan')
-            student.religion = request.POST.get('religion', '')
-            
-            student.email = request.POST.get('email', '')
-            student.phone_number = request.POST.get('phone_number', '')
-            student.address = request.POST.get('address', '')
-            
-            student.admission_date = request.POST.get('admission_date')
-            student.curriculum_id = request.POST.get('curriculum')
-            student.current_grade_level_id = request.POST.get('grade_level')
-            student.current_stream_id = request.POST.get('stream')
-            student.academic_year_id = request.POST.get('academic_year')
+        admission_number = request.POST.get('admission_number', '').strip()
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        middle_name = request.POST.get('middle_name', '').strip()
+        date_of_birth = request.POST.get('date_of_birth', '').strip()
+        gender = request.POST.get('gender', '').strip()
+        nationality = request.POST.get('nationality', 'Kenyan').strip()
+        religion = request.POST.get('religion', '').strip()
+        email = request.POST.get('email', '').strip()
+        phone_number = request.POST.get('phone_number', '').strip()
+        address = request.POST.get('address', '').strip()
+        admission_date = request.POST.get('admission_date', '').strip()
+        curriculum_id = request.POST.get('curriculum', '').strip()
+        grade_level_id = request.POST.get('grade_level', '').strip()
+        stream_id = request.POST.get('stream', '').strip()
+        academic_year_id = request.POST.get('academic_year', '').strip()
+        guardian_name = request.POST.get('guardian_name', '').strip()
+        guardian_phone = request.POST.get('guardian_phone', '').strip()
+        guardian_email = request.POST.get('guardian_email', '').strip()
+        guardian_relationship = request.POST.get('guardian_relationship', '').strip()
+        status = request.POST.get('status', 'ACTIVE').strip()
 
-            if not can_use_class(request.user, student.current_grade_level_id, student.current_stream_id, student.academic_year_id):
-                messages.error(request, 'You can only manage learners in your assigned class and stream.')
-                return redirect('students:edit', student_id=student.id)
-            
-            student.guardian_name = request.POST.get('guardian_name', '')
-            student.guardian_phone = request.POST.get('guardian_phone', '')
-            student.guardian_email = request.POST.get('guardian_email', '')
-            student.guardian_relationship = request.POST.get('guardian_relationship', '')
-            
-            student.status = request.POST.get('status', 'ACTIVE')
-            student.updated_by = request.user
-            
-            student.save()
-            
+        required_fields = {
+            'admission number': admission_number,
+            'first name': first_name,
+            'last name': last_name,
+            'date of birth': date_of_birth,
+            'gender': gender,
+            'admission date': admission_date,
+            'curriculum': curriculum_id,
+            'grade': grade_level_id,
+            'stream': stream_id,
+            'academic year': academic_year_id,
+        }
+        missing = [label for label, value in required_fields.items() if not value]
+        if missing:
+            messages.error(request, 'Required field(s): ' + ', '.join(missing) + '.')
+            return redirect('students:edit', student_id=student.id)
+        if status not in dict(Student.STATUS_CHOICES):
+            messages.error(request, 'Select a valid student status.')
+            return redirect('students:edit', student_id=student.id)
+
+        grade_level, stream, academic_year, curriculum, placement_error = _validate_placement(
+            grade_level_id, stream_id, academic_year_id, curriculum_id
+        )
+        if placement_error:
+            messages.error(request, placement_error)
+            return redirect('students:edit', student_id=student.id)
+        if not can_use_class(request.user, grade_level.id, stream.id, academic_year.id):
+            messages.error(request, 'You can only manage learners in your assigned class and stream.')
+            return redirect('students:edit', student_id=student.id)
+        if Student.objects.filter(admission_number=admission_number).exclude(id=student.id).exists():
+            messages.error(request, f'Admission number {admission_number} is already in use.')
+            return redirect('students:edit', student_id=student.id)
+
+        try:
+            with transaction.atomic():
+                _record_current_placement(student, grade_level, stream, academic_year)
+                student.admission_number = admission_number
+                student.first_name = first_name
+                student.last_name = last_name
+                student.middle_name = middle_name or None
+                student.date_of_birth = date_of_birth
+                student.gender = gender
+                student.nationality = nationality or 'Kenyan'
+                student.religion = religion or None
+                student.email = email or None
+                student.phone_number = phone_number or None
+                student.address = address or None
+                student.admission_date = admission_date
+                student.curriculum_id = curriculum.id
+                student.current_grade_level_id = grade_level.id
+                student.current_stream_id = stream.id
+                student.academic_year_id = academic_year.id
+                student.guardian_name = guardian_name or None
+                student.guardian_phone = guardian_phone or None
+                student.guardian_email = guardian_email or None
+                student.guardian_relationship = guardian_relationship or None
+                student.status = status
+                student.updated_by = request.user
+                student.save()
+                _record_current_placement(student, grade_level, stream, academic_year)
+
             messages.success(request, f'Student {student.full_name} updated successfully!')
             return redirect('students:detail', student_id=student.id)
-            
         except Exception as e:
             messages.error(request, f'Error updating student: {str(e)}')
+            return redirect('students:edit', student_id=student.id)
     
     context = {
         'student': student,
@@ -483,31 +588,52 @@ def student_transfer(request, student_id):
         return redirect('students:detail', student_id=student.id)
     
     if request.method == 'POST':
-        new_grade_level_id = request.POST.get('grade_level')
-        new_stream_id = request.POST.get('stream')
-        academic_year_id = request.POST.get('academic_year')
-
-        if not can_use_class(request.user, new_grade_level_id, new_stream_id, academic_year_id):
+        grade_level, stream, academic_year, _, placement_error = _validate_placement(
+            request.POST.get('grade_level'),
+            request.POST.get('stream'),
+            request.POST.get('academic_year'),
+        )
+        if placement_error:
+            messages.error(request, placement_error)
+            return redirect('students:transfer', student_id=student.id)
+        if is_admin(request.user) is False and not can_edit_student(request.user, student):
+            messages.error(request, 'You can only transfer learners assigned to your class.')
+            return redirect('students:transfer', student_id=student.id)
+        if is_admin(request.user) and not can_use_class(request.user, grade_level.id, stream.id, academic_year.id):
             messages.error(request, 'You can only transfer learners within your assigned class scope.')
             return redirect('students:transfer', student_id=student.id)
-        
-        # Update current class
-        student.current_grade_level_id = new_grade_level_id
-        student.current_stream_id = new_stream_id
-        student.academic_year_id = academic_year_id
-        student.save()
-        
-        # Add history entry
-        StudentHistory.objects.create(
-            student=student,
-            academic_year_id=academic_year_id,
-            grade_level_id=new_grade_level_id,
-            stream_id=new_stream_id,
-            is_current=True
-        )
-        
-        messages.success(request, f'Student {student.full_name} transferred successfully!')
-        return redirect('students:detail', student_id=student.id)
+
+        try:
+            with transaction.atomic():
+                old_placement = {
+                    'grade_level': student.current_grade_level_id,
+                    'stream': student.current_stream_id,
+                    'academic_year': student.academic_year_id,
+                }
+                student.current_grade_level_id = grade_level.id
+                student.current_stream_id = stream.id
+                student.academic_year_id = academic_year.id
+                student.updated_by = request.user
+                student.save()
+                _record_current_placement(student, grade_level, stream, academic_year)
+                AuditLog.objects.create(
+                    user=request.user,
+                    action='UPDATE',
+                    model_name='Student',
+                    object_id=str(student.id),
+                    object_repr=str(student),
+                    changes={'placement_from': old_placement, 'placement_to': {
+                        'grade_level': grade_level.id,
+                        'stream': stream.id,
+                        'academic_year': academic_year.id,
+                    }},
+                )
+
+            messages.success(request, f'Student {student.full_name} transferred successfully!')
+            return redirect('students:detail', student_id=student.id)
+        except Exception as e:
+            messages.error(request, f'Error transferring student: {str(e)}')
+            return redirect('students:transfer', student_id=student.id)
     
     context = {
         'student': student,
@@ -516,6 +642,110 @@ def student_transfer(request, student_id):
         'academic_years': AcademicYear.objects.all().order_by('-year'),
     }
     return render(request, 'students/transfer.html', context)
+
+
+@login_required
+def student_bulk_transfer(request):
+    """Transfer multiple students to another class."""
+    if not is_admin(request.user):
+        messages.error(request, 'Only administrators can perform bulk student transfers.')
+        return redirect('students:list')
+
+    if request.method == 'POST':
+        source_grade, source_stream, source_year, _, source_error = _validate_placement(
+            request.POST.get('source_grade_level'),
+            request.POST.get('source_stream'),
+            request.POST.get('source_academic_year'),
+        )
+        destination_grade, destination_stream, destination_year, _, destination_error = _validate_placement(
+            request.POST.get('destination_grade_level'),
+            request.POST.get('destination_stream'),
+            request.POST.get('destination_academic_year'),
+        )
+        if source_error or destination_error:
+            messages.error(request, source_error or destination_error)
+            return redirect('students:bulk_transfer')
+        if (
+            source_grade.id == destination_grade.id
+            and source_stream.id == destination_stream.id
+            and source_year.id == destination_year.id
+        ):
+            messages.error(request, 'Select a different destination class.')
+            return redirect('students:bulk_transfer')
+        if not can_use_class(request.user, source_grade.id, source_stream.id, source_year.id):
+            messages.error(request, 'You can only transfer learners from your assigned class scope.')
+            return redirect('students:bulk_transfer')
+        if not can_use_class(request.user, destination_grade.id, destination_stream.id, destination_year.id):
+            messages.error(request, 'You can only transfer learners to your assigned class scope.')
+            return redirect('students:bulk_transfer')
+
+        requested_ids = request.POST.getlist('student_ids')
+        student_ids = []
+        for value in requested_ids:
+            student_id = _positive_id(value)
+            if student_id and student_id not in student_ids:
+                student_ids.append(student_id)
+        if not student_ids:
+            messages.error(request, 'Select at least one student to transfer.')
+            return redirect('students:bulk_transfer')
+
+        source_students = permitted_student_queryset(request.user).filter(
+            current_grade_level_id=source_grade.id,
+            current_stream_id=source_stream.id,
+            academic_year_id=source_year.id,
+            id__in=student_ids,
+        )
+        students = list(source_students.select_related('current_grade_level', 'current_stream', 'academic_year'))
+        if len(students) != len(student_ids):
+            messages.error(request, 'One or more selected students are not in the selected source class.')
+            return redirect('students:bulk_transfer')
+
+        try:
+            with transaction.atomic():
+                for student in students:
+                    student.current_grade_level_id = destination_grade.id
+                    student.current_stream_id = destination_stream.id
+                    student.academic_year_id = destination_year.id
+                    student.updated_by = request.user
+                    student.save()
+                    _record_current_placement(student, destination_grade, destination_stream, destination_year)
+
+            messages.success(request, f'{len(students)} students transferred successfully!')
+            return redirect('students:list')
+        except Exception as e:
+            messages.error(request, f'Error transferring students: {str(e)}')
+            return redirect('students:bulk_transfer')
+
+    source_grade_id = request.GET.get('source_grade_level', '')
+    source_stream_id = request.GET.get('source_stream', '')
+    source_year_id = request.GET.get('source_academic_year', '')
+    source_grade = None
+    source_stream = None
+    source_year = None
+    if source_grade_id and source_stream_id and source_year_id:
+        source_grade, source_stream, source_year, _, source_error = _validate_placement(
+            source_grade_id, source_stream_id, source_year_id
+        )
+        if not source_error and can_use_class(request.user, source_grade.id, source_stream.id, source_year.id):
+            source_students = permitted_student_queryset(request.user).filter(
+                current_grade_level_id=source_grade.id,
+                current_stream_id=source_stream.id,
+                academic_year_id=source_year.id,
+            ).select_related('current_grade_level', 'current_stream', 'academic_year')
+
+    context = {
+        'grade_levels': GradeLevel.objects.filter(is_active=True),
+        'streams': Stream.objects.filter(is_active=True),
+        'academic_years': AcademicYear.objects.all().order_by('-year'),
+        'source_grade_level': source_grade_id,
+        'source_stream': source_stream_id,
+        'source_academic_year': source_year_id,
+        'source_grade': source_grade,
+        'source_stream_object': source_stream,
+        'source_year_object': source_year,
+        'source_students': source_students,
+    }
+    return render(request, 'students/bulk_transfer.html', context)
 
 
 @login_required

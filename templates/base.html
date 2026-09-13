@@ -22,6 +22,7 @@
         <nav class="sidebar-menu">
             <div class="menu-label">Main</div>
             <a href="{% url 'core:dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' and request.resolver_match.app_name == 'core' %}active{% endif %}"><i class="fas fa-th-large"></i> Dashboard</a>
+            <a href="{% url 'teachers:my_status' %}" class="{% if request.resolver_match.url_name == 'my_status' %}active{% endif %}"><i class="fas fa-user-circle"></i> My Status</a>
             {% if not user.is_staff and not user.is_superuser %}
             {% if user|has_teacher_profile and not user|teacher_is_active %}
             <a href="{% url 'teachers:request_approval' %}" class="text-warning"><i class="fas fa-bell"></i> Request Approval</a>
@@ -30,12 +31,18 @@
             <div class="menu-label">Management</div>
             <a href="{% url 'students:list' %}" class="{% if request.resolver_match.app_name == 'students' %}active{% endif %}"><i class="fas fa-users"></i> Students</a>
             {% if user.is_staff or user.is_superuser %}
-            <a href="{% url 'teachers:list' %}" class="{% if request.resolver_match.app_name == 'teachers' %}active{% endif %}"><i class="fas fa-chalkboard-teacher"></i> Teachers</a>
+            <a href="{% url 'teachers:list' %}" class="{% if request.resolver_match.url_name == 'list' %}active{% endif %}"><i class="fas fa-chalkboard-teacher"></i> Teachers</a>
+            <a href="{% url 'teachers:class_teacher_list' %}" class="{% if request.resolver_match.url_name == 'class_teacher_list' %}active{% endif %}"><i class="fas fa-users-gear"></i> Class Teachers</a>
             {% endif %}
             <a href="{% url 'examinations:list' %}" class="{% if request.resolver_match.app_name == 'examinations' %}active{% endif %}"><i class="fas fa-file-alt"></i> Examinations</a>
             <div class="menu-label">Academics</div>
             <a href="{% url 'marks:entry' %}"><i class="fas fa-edit"></i> Mark Entry</a>
+            {% if not user.is_staff and not user.is_superuser %}
+            <a href="{% url 'teachers:request_create' %}"><i class="fas fa-paper-plane"></i> Request Role/Assignment</a>
+            <a href="{% url 'teachers:requests' %}"><i class="fas fa-clipboard-list"></i> My Requests</a>
+            {% endif %}
             {% if user.is_staff or user.is_superuser %}
+            <a href="{% url 'teachers:requests' %}" class="{% if request.resolver_match.url_name == 'requests' %}active{% endif %}"><i class="fas fa-clipboard-list"></i> Review Requests</a>
             <a href="{% url 'marks:admin_mark_management' %}"><i class="fas fa-search-dollar"></i> Admin Mark Management</a>
             {% endif %}
             <a href="{% url 'grading:process' %}"><i class="fas fa-cogs"></i> Grading Engine</a>
