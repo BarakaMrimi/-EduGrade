@@ -9,9 +9,282 @@ from students.models import Student
 from students.views import _record_current_placement
 from django.contrib.auth.models import User
 from .services import bulk_reallocate_students, reallocate_and_delete
+from teachers.models import TeacherAssignment, ClassTeacher
+
+
+def _transfer_students(source_stream_ids, source_grade_ids, dest_stream_id, dest_grade_id):
+    from students.models import Student, StudentHistory
+    transferred = 0
+
+    if dest_stream_id:
+        students = Student.objects.filter(current_stream_id__in=source_stream_ids)
+    elif dest_grade_id:
+        students = Student.objects.filter(current_grade_level_id__in=source_grade_ids)
+    else:
+        return 0
+
+    for student in students:
+        if dest_stream_id:
+            student.current_stream_id = dest_stream_id
+        elif dest_grade_id:
+            student.current_grade_level_id = dest_grade_id
+
+        student.save()
+
+        StudentHistory.objects.create(
+            student=student,
+            grade_level_id=student.current_grade_level_id,
+            stream_id=student.current_stream_id,
+            is_current=True,
+        )
+
+        transferred += 1
+
+    return transferred
+
+
+def _transfer_teacher_assignments(source_stream_ids, source_grade_ids, dest_stream_id, dest_grade_id):
+    transferred = 0
+
+    if dest_stream_id:
+        for ta in TeacherAssignment.objects.filter(stream_id__in=source_stream_ids):
+            ta.stream_id = dest_stream_id
+            ta.save()
+            transferred += 1
+
+        for ct in ClassTeacher.objects.filter(stream_id__in=source_stream_ids):
+            ct.stream_id = dest_stream_id
+            ct.save()
+
+    elif dest_grade_id:
+        for ta in TeacherAssignment.objects.filter(grade_level_id__in=source_grade_ids):
+            ta.grade_level_id = dest_grade_id
+            ta.save()
+            transferred += 1
+
+        for ct in ClassTeacher.objects.filter(grade_level_id__in=source_grade_ids):
+            ct.grade_level_id = dest_grade_id
+            ct.save()
+
+    return transferred
+
 
 @login_required
 def school_setup_dashboard(request):
+    "School setup main dashboard"
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, 'Only administrators can access school setup!')
+        return redirect('core:dashboard')
+    
+    context = {
+        'academic_years': AcademicYear.objects.all().order_by('-year'),
+        'terms': Term.objects.select_related('academic_year').all(),
+        'curriculums': Curriculum.objects.all(),
+        'grade_levels': GradeLevel.objects.select_related('curriculum').all(),
+        'streams': Stream.objects.select_related('grade_level').all(),
+        'subjects': Subject.objects.select_related('curriculum').all(),
+        'total_years': AcademicYear.objects.count(),
+        'total_terms': Term.objects.count(),
+        'total_curriculums': Curriculum.objects.count(),
+        'total_grades': GradeLevel.objects.count(),
+        'total_streams': Stream.objects.count(),
+        'total_subjects': Subject.objects.count(),
+    }
+    return render(request, 'school/setup_dashboard.html', context)
+
+
+@login_required
+def bulk_transfer(request):
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, 'Only administrators can perform bulk transfers!')
+        return redirect('school:setup_dashboard')
+
+    streams = Stream.objects.select_related('grade_level').filter(is_active=True)
+    grade_levels = GradeLevel.objects.select_related('curriculum').filter(is_active=True)
+
+    if request.method == 'POST':
+        transfer_type = request.POST.get('transfer_type')
+        source_ids = request.POST.getlist('source_items')
+        dest_stream_id = request.POST.get('dest_stream')
+        dest_grade_id = request.POST.get('dest_grade')
+        move_students = request.POST.get('move_students') == 'on'
+        move_teachers = request.POST.get('move_teachers') == 'on'
+
+        if not source_ids:
+            messages.error(request, 'Please select at least one source item.')
+            return redirect('school:bulk_transfer')
+
+        if transfer_type == 'stream' and dest_stream_id:
+            source_stream_ids = list(map(int, source_ids))
+            dest_stream = get_object_or_404(Stream, id=dest_stream_id)
+            if dest_stream.id in source_stream_ids:
+                messages.error(request, 'Destination must be different from source.')
+                return redirect('school:bulk_transfer')
+            with transaction.atomic():
+                student_count = 0
+                teacher_count = 0
+                if move_students:
+                    student_count = _transfer_students(source_stream_ids, [], dest_stream_id, None)
+                if move_teachers:
+                    teacher_count = _transfer_teacher_assignments(source_stream_ids, [], dest_stream_id, None)
+                Stream.objects.filter(id__in=source_stream_ids).update(is_active=False)
+            messages.success(request, (
+                f'Bulk transfer complete! '
+                f'{student_count} student(s) and {teacher_count} teacher assignment(s) '
+                f'moved to {dest_stream}. Source streams deactivated.'
+            ))
+            return redirect('school:setup_dashboard')
+
+        elif transfer_type == 'grade' and dest_grade_id:
+            source_grade_ids = list(map(int, source_ids))
+            dest_grade = get_object_or_404(GradeLevel, id=dest_grade_id)
+            if dest_grade.id in source_grade_ids:
+                messages.error(request, 'Destination must be different from source.')
+                return redirect('school:bulk_transfer')
+            with transaction.atomic():
+                student_count = 0
+                teacher_count = 0
+                if move_students:
+                    student_count = _transfer_students([], source_grade_ids, None, dest_grade_id)
+                if move_teachers:
+                    teacher_count = _transfer_teacher_assignments([], source_grade_ids, None, dest_grade_id)
+                GradeLevel.objects.filter(id__in=source_grade_ids).update(is_active=False)
+            messages.success(request, (
+                f'Bulk transfer complete! '
+                f'{student_count} student(s) and {teacher_count} teacher assignment(s) '
+                f'moved to {dest_grade}. Source grade levels deactivated.'
+            ))
+            return redirect('school:setup_dashboard')
+        else:
+            messages.error(request, 'Please select a valid destination.')
+            return redirect('school:bulk_transfer')
+
+    context = {
+        'streams': streams,
+        'grade_levels': grade_levels,
+    }
+    return render(request, 'school/bulk_transfer.html', context)
+
+
+@login_required
+def stream_delete(request, stream_id):
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, 'Unauthorized!')
+        return redirect('school:setup_dashboard')
+
+    stream = get_object_or_404(Stream, id=stream_id)
+    student_count = stream.students.filter(is_active=True).count()
+    teacher_assign_count = TeacherAssignment.objects.filter(stream=stream).count()
+    class_teacher_count = ClassTeacher.objects.filter(stream=stream).count()
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'transfer_delete':
+            dest_stream_id = request.POST.get('dest_stream')
+            move_students = request.POST.get('move_students') == 'on'
+            move_teachers = request.POST.get('move_teachers') == 'on'
+            if not dest_stream_id or int(dest_stream_id) == stream_id:
+                messages.error(request, 'Please select a valid destination stream.')
+                return redirect('school:stream_delete', stream_id=stream_id)
+            from students.models import Student, StudentHistory
+            with transaction.atomic():
+                student_count_moved = 0
+                if move_students:
+                    for s in Student.objects.filter(current_stream=stream, is_active=True):
+                        s.current_stream_id = dest_stream_id
+                        s.save()
+                        StudentHistory.objects.create(
+                            student=s, grade_level=s.current_grade_level, stream_id=dest_stream_id, is_current=True,
+                        )
+                        student_count_moved += 1
+                if move_teachers:
+                    TeacherAssignment.objects.filter(stream=stream).update(stream_id=dest_stream_id)
+                    ClassTeacher.objects.filter(stream=stream).update(stream_id=dest_stream_id)
+                stream.is_active = False
+                stream.save()
+            messages.success(request, (
+                f'Stream "{stream.name}" deactivated. '
+                f'{student_count_moved} student(s) and teacher assignments transferred.'
+            ))
+            return redirect('school:setup_dashboard')
+
+        elif action == 'delete':
+            stream_name = stream.name
+            stream.delete()
+            messages.success(request, f'Stream {stream_name} deleted successfully!')
+            return redirect('school:setup_dashboard')
+
+    context = {
+        'stream': stream,
+        'streams': Stream.objects.filter(is_active=True).exclude(id=stream_id),
+        'student_count': student_count,
+        'teacher_assign_count': teacher_assign_count,
+        'class_teacher_count': class_teacher_count,
+    }
+    return render(request, 'school/delete_stream.html', context)
+
+
+@login_required
+def grade_level_delete(request, grade_id):
+    if not (request.user.is_staff or request.user.is_superuser):
+        messages.error(request, 'Unauthorized!')
+        return redirect('school:setup_dashboard')
+
+    grade = get_object_or_404(GradeLevel, id=grade_id)
+    student_count = grade.students.filter(is_active=True).count()
+    teacher_assign_count = TeacherAssignment.objects.filter(grade_level=grade).count()
+    class_teacher_count = ClassTeacher.objects.filter(grade_level=grade).count()
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'transfer_delete':
+            dest_grade_id = request.POST.get('dest_grade')
+            move_students = request.POST.get('move_students') == 'on'
+            move_teachers = request.POST.get('move_teachers') == 'on'
+            if not dest_grade_id or int(dest_grade_id) == grade_id:
+                messages.error(request, 'Please select a valid destination grade level.')
+                return redirect('school:grade_level_delete', grade_id=grade_id)
+            from students.models import Student, StudentHistory
+            with transaction.atomic():
+                student_count_moved = 0
+                if move_students:
+                    for s in Student.objects.filter(current_grade_level=grade, is_active=True):
+                        s.current_grade_level_id = dest_grade_id
+                        s.save()
+                        StudentHistory.objects.create(
+                            student=s, grade_level_id=dest_grade_id, stream=s.current_stream, is_current=True,
+                        )
+                        student_count_moved += 1
+                if move_teachers:
+                    TeacherAssignment.objects.filter(grade_level=grade).update(grade_level_id=dest_grade_id)
+                    ClassTeacher.objects.filter(grade_level=grade).update(grade_level_id=dest_grade_id)
+                grade.is_active = False
+                grade.save()
+            messages.success(request, (
+                f'Grade Level "{grade.name}" deactivated. '
+                f'{student_count_moved} student(s) and teacher assignments transferred.'
+            ))
+            return redirect('school:setup_dashboard')
+
+        elif action == 'delete':
+            grade_name = grade.name
+            grade.delete()
+            messages.success(request, f'Grade Level {grade_name} deleted successfully!')
+            return redirect('school:setup_dashboard')
+
+    context = {
+        'grade': grade,
+        'grade_levels': GradeLevel.objects.filter(is_active=True).exclude(id=grade_id),
+        'student_count': student_count,
+        'teacher_assign_count': teacher_assign_count,
+        'class_teacher_count': class_teacher_count,
+    }
+    return render(request, 'school/delete_grade.html', context)
+
+
+# ============================================
+# API ENDPOINTS FOR DYNAMIC LOADING
+# ============================================
     "School setup main dashboard"
     if not (request.user.is_staff or request.user.is_superuser):
         messages.error(request, 'Only administrators can access school setup!')
@@ -391,33 +664,56 @@ def grade_level_delete(request, grade_id):
             or grade.classteacher_set.exists()
             or grade.teacherassignment_set.exists()
         )
+
         target_grade = GradeLevel.objects.filter(
             id=request.POST.get('target_grade'), is_active=True,
         ).exclude(id=grade.id).first()
+
         target_stream = Stream.objects.filter(
-            id=request.POST.get('target_stream'), grade_level=target_grade,
+            id=request.POST.get('target_stream'),
+            grade_level=target_grade,
             is_active=True,
         ).first() if target_grade else None
+
         if has_dependants and (not target_grade or not target_stream):
-            messages.error(request, 'Select a destination grade and stream before deleting this grade.')
+            messages.error(
+                request,
+                'Select a destination grade and stream before deleting this grade.'
+            )
         elif has_dependants:
             grade_name = grade.name
-            reallocate_and_delete(grade, target_grade, target_stream, request.user)
-            messages.success(request, f'Grade Level {grade_name} deleted and its dependants reallocated.')
+            reallocate_and_delete(
+                grade,
+                target_grade,
+                target_stream,
+                request.user
+            )
+            messages.success(
+                request,
+                f'Grade Level {grade_name} deleted and its dependants reallocated.'
+            )
             return redirect('school:setup_dashboard')
         else:
             grade_name = grade.name
             grade.delete()
-            messages.success(request, f'Grade Level {grade_name} deleted successfully!')
+            messages.success(
+                request,
+                f'Grade Level {grade_name} deleted successfully!'
+            )
             return redirect('school:setup_dashboard')
 
     context = {
         'grade': grade,
         'student_count': grade.students.count(),
-        'target_grades': GradeLevel.objects.filter(is_active=True).exclude(id=grade.id),
-        'target_streams': Stream.objects.filter(is_active=True).exclude(grade_level=grade),
+        'target_grades': GradeLevel.objects.filter(
+            is_active=True
+        ).exclude(id=grade.id),
+        'target_streams': Stream.objects.filter(
+            is_active=True
+        ).exclude(grade_level=grade),
         'target_years': AcademicYear.objects.all().order_by('-year'),
     }
+
     return render(request, 'school/grade_reallocate.html', context)
 
 
@@ -507,33 +803,55 @@ def stream_delete(request, stream_id):
     
     if request.method == 'POST':
         target_stream = Stream.objects.filter(
-            id=request.POST.get('target_stream'), is_active=True,
+            id=request.POST.get('target_stream'),
+            is_active=True,
         ).exclude(id=stream.id).select_related('grade_level').first()
+
         has_dependants = (
             stream.students.exists()
             or stream.classteacher_set.exists()
             or stream.teacherassignment_set.exists()
         )
+
         if has_dependants and not target_stream:
-            messages.error(request, 'Select a destination stream before deleting this stream.')
+            messages.error(
+                request,
+                'Select a destination stream before deleting this stream.'
+            )
         elif has_dependants:
             stream_name = stream.name
-            reallocate_and_delete(stream, target_stream.grade_level, target_stream, request.user)
-            messages.success(request, f'Stream {stream_name} deleted and its dependants reallocated.')
+            reallocate_and_delete(
+                stream,
+                target_stream.grade_level,
+                target_stream,
+                request.user
+            )
+            messages.success(
+                request,
+                f'Stream {stream_name} deleted and its dependants reallocated.'
+            )
             return redirect('school:setup_dashboard')
         else:
             stream_name = stream.name
             stream.delete()
-            messages.success(request, f'Stream {stream_name} deleted successfully!')
+            messages.success(
+                request,
+                f'Stream {stream_name} deleted successfully!'
+            )
             return redirect('school:setup_dashboard')
 
     context = {
         'stream': stream,
         'student_count': stream.students.count(),
-        'target_streams': Stream.objects.filter(is_active=True).exclude(id=stream.id),
-        'target_grades': GradeLevel.objects.filter(is_active=True).exclude(id=stream.grade_level_id),
+        'target_streams': Stream.objects.filter(
+            is_active=True
+        ).exclude(id=stream.id),
+        'target_grades': GradeLevel.objects.filter(
+            is_active=True
+        ).exclude(id=stream.grade_level_id),
         'target_years': AcademicYear.objects.all().order_by('-year'),
     }
+
     return render(request, 'school/stream_reallocate.html', context)
 
 

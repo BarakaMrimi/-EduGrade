@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Delete Stream - EduGrade{% endblock %}
+{% block page_title %}Delete Stream{% endblock %}
+{% block page_subtitle %}Manage stream and transfer data{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Stream Info Card -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0"><i class="fas fa-info-circle"></i> Stream: {{ stream.name }} ({{ stream.code }})</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-4 mb-3">
+                            <div class="stat-card" style="border-left-color: #3b82f6;">
+                                <div class="stat-label">Students</div>
+                                <div class="stat-number">{{ student_count }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="stat-card" style="border-left-color: #8b5cf6;">
+                                <div class="stat-label">Teacher Assignments</div>
+                                <div class="stat-number">{{ teacher_assign_count }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="stat-card" style="border-left-color: #ef4444;">
+                                <div class="stat-label">Class Teachers</div>
+                                <div class="stat-number">{{ class_teacher_count }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Transfer Form (for transfer_delete action) -->
+            <div class="card shadow mb-4 border-success">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-exchange-alt"></i> Transfer Before Deleting</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Select a destination stream to transfer all students and teacher assignments before deactivating this stream.</p>
+                    
+                    <form method="post" action="{% url 'school:stream_delete' stream.id %}">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Destination Stream <span class="text-danger">*</span></label>
+                            <select class="form-select" name="dest_stream" required>
+                                <option value="">-- Select Destination Stream --</option>
+                                {% for s in streams %}
+                                <option value="{{ s.id }}">{{ s.grade_level.name }} - {{ s.name }} ({{ s.code }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">What to Transfer</label>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="move_students" id="move_students_delete" checked>
+                                <label class="form-check-label" for="move_students_delete">
+                                    <i class="fas fa-user-graduate text-info"></i> Students ({{ student_count }})
+                                </label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="move_teachers" id="move_teachers_delete" checked>
+                                <label class="form-check-label" for="move_teachers_delete">
+                                    <i class="fas fa-chalkboard-teacher text-warning"></i> Teacher Assignments ({{ teacher_assign_count }})
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" name="action" value="transfer_delete" class="btn btn-success btn-lg">
+                                <i class="fas fa-exchange-alt"></i> Transfer & Deactivate Stream
+                            </button>
+                            <a href="{% url 'school:setup_dashboard' %}" class="btn btn-secondary btn-lg">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Direct Delete (kept for reference - disabled by default) -->
+            <div class="card shadow mb-4 border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="fas fa-trash"></i> Direct Delete (No Transfer)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        <strong>Warning:</strong> Deleting without transferring will orphan {{ student_count }} student(s) and {{ teacher_assign_count }} teacher assignment(s).
+                    </div>
+                    <form method="post" action="{% url 'school:stream_delete' stream.id %}" 
+                          onsubmit="return confirm('Are you sure you want to DELETE this stream without transferring? This will orphan all students and teacher assignments!');">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="delete">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash"></i> Delete Stream Permanently
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

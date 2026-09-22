@@ -82,6 +82,9 @@
     <h6 class="fw-bold text-muted mb-3"><i class="fas fa-bolt me-2"></i>Quick Actions</h6>
     <div class="row g-3 mb-4">
         <div class="col-xl-2 col-md-4 col-6"><a href="{% url 'students:create' %}" class="quick-action"><i class="fas fa-user-plus text-primary"></i><span>Add Student</span></a></div>
+        {% if user.is_staff or user.is_superuser %}
+        <div class="col-xl-2 col-md-4 col-6"><a href="{% url 'teachers:list' %}" class="quick-action"><i class="fas fa-chalkboard-teacher text-success"></i><span>View Teachers</span></a></div>
+        {% endif %}
         <div class="col-xl-2 col-md-4 col-6"><a href="{% url 'examinations:create' %}" class="quick-action"><i class="fas fa-plus-circle text-info"></i><span>Create Exam</span></a></div>
         <div class="col-xl-2 col-md-4 col-6"><a href="{% url 'marks:entry' %}" class="quick-action"><i class="fas fa-pen-to-square text-warning"></i><span>Enter Marks</span></a></div>
         <div class="col-xl-2 col-md-4 col-6"><a href="{% url 'grading:process' %}" class="quick-action"><i class="fas fa-gears text-danger"></i><span>Process Grades</span></a></div>

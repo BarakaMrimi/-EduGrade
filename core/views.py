@@ -56,8 +56,8 @@ def dashboard(request):
         show_request_button = teacher_assignments.count() == 0 and teacher_profile is not None
         pending_requests = teacher_profile.requests.filter(status='PENDING').count() if teacher_profile else 0
     
-    total_teachers = TeacherProfile.objects.count()
-    active_teachers = TeacherProfile.objects.filter(status='ACTIVE', is_active=True).count()
+    total_teachers = TeacherProfile.objects.filter(created_via='SELF_REGISTER', is_active=True, status='ACTIVE').count()
+    active_teachers = TeacherProfile.objects.filter(created_via='SELF_REGISTER', is_active=True, status='ACTIVE').count()
     
     total_exams = Examination.objects.count()
     exams_844 = Examination.objects.filter(curriculum__code='844').count()

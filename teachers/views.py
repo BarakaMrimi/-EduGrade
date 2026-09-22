@@ -26,7 +26,14 @@ def teacher_list(request):
     if not _is_admin(request.user):
         messages.error(request, 'Only administrators can view all teachers.')
         return redirect('core:dashboard')
-    teachers = TeacherProfile.objects.select_related('user').all()
+    
+    # Default to showing only functional teachers (self-registered, active)
+    show_all = request.GET.get('show_all') == '1'
+    teachers = TeacherProfile.objects.select_related('user').filter(
+        created_via='SELF_REGISTER',
+        is_active=True,
+        status='ACTIVE'
+    )
     
     search_query = request.GET.get('search', '')
     if search_query:
@@ -37,9 +44,17 @@ def teacher_list(request):
             Q(email__icontains=search_query)
         )
     
-    status_filter = request.GET.get('status', '')
-    if status_filter:
-        teachers = teachers.filter(status=status_filter)
+    if show_all:
+        teachers = TeacherProfile.objects.select_related('user').filter(
+            created_via='SELF_REGISTER'
+        )
+        if search_query:
+            teachers = teachers.filter(
+                Q(staff_number__icontains=search_query) |
+                Q(first_name__icontains=search_query) |
+                Q(last_name__icontains=search_query) |
+                Q(email__icontains=search_query)
+            )
     
     paginator = Paginator(teachers, 20)
     page_number = request.GET.get('page')
@@ -51,9 +66,10 @@ def teacher_list(request):
         'teachers': page_obj,
         'search_query': search_query,
         'status_choices': TeacherProfile.STATUS_CHOICES,
-        'selected_status': status_filter,
+        'selected_status': '',
         'pending_requests': TeacherRequest.objects.filter(status='PENDING').count(),
         'pagination_query': query_params.urlencode(),
+        'show_all': show_all,
     }
     return render(request, 'teachers/list.html', context)
 

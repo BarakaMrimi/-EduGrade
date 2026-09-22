@@ -122,6 +122,11 @@
             <i class="fas fa-book text-purple"></i>
             <span>Curriculum</span>
         </button>
+
+        <a href="{% url 'school:bulk_transfer' %}" class="quick-action" style="text-decoration:none;">
+            <i class="fas fa-exchange-alt text-danger"></i>
+            <span>Bulk Transfer</span>
+        </a>
     </div>
     <div class="col-md-2 col-4">
         <button class="quick-action" data-bs-toggle="modal" data-bs-target="#addSubjectModal">
@@ -348,9 +353,9 @@
                                 <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editGradeModal{{ grade.id }}">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteGradeModal{{ grade.id }}">
+                                <a href="{% url 'school:grade_level_delete' grade.id %}" class="btn btn-outline-danger">
                                     <i class="fas fa-trash"></i>
-                                </button>
+                                </a>
                             </div>
                         </td>
                     </tr>
@@ -407,9 +412,9 @@
                                 <button class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#editStreamModal{{ stream.id }}">
                                     <i class="fas fa-edit"></i>
                                 </button>
-                                <button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteStreamModal{{ stream.id }}">
+                                <a href="{% url 'school:stream_delete' stream.id %}" class="btn btn-outline-danger">
                                     <i class="fas fa-trash"></i>
-                                </button>
+                                </a>
                             </div>
                         </td>
                     </tr>
@@ -1052,7 +1057,7 @@
 </div>
 {% endfor %}
 
-<!-- Stream Edit/Delete Modals -->
+<!-- Stream Edit Modals -->
 {% for stream in streams %}
 <div class="modal fade" id="editStreamModal{{ stream.id }}" tabindex="-1">
     <div class="modal-dialog">

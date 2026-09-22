@@ -1,0 +1,146 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Bulk Transfer - EduGrade{% endblock %}
+{% block page_title %}Bulk Transfer{% endblock %}
+{% block page_subtitle %}Transfer students and teachers between streams/grades{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-exchange-alt"></i> Bulk Transfer Students & Teachers</h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" action="{% url 'school:bulk_transfer' %}">
+                        {% csrf_token %}
+                        
+                        <!-- Transfer Type -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Transfer Type <span class="text-danger">*</span></label>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="transfer_type" id="transfer_stream" value="stream" checked>
+                                <label class="form-check-label" for="transfer_stream">Between Streams</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="transfer_type" id="transfer_grade" value="grade">
+                                <label class="form-check-label" for="transfer_grade">Between Grade Levels</label>
+                            </div>
+                        </div>
+
+                        <!-- Stream Transfer Section -->
+                        <div id="stream_transfer_section">
+                            <h6 class="fw-bold text-muted mb-3">Select Source Streams</h6>
+                            <div class="row mb-4">
+                                {% for stream in streams %}
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="card border-primary h-100">
+                                        <div class="card-body p-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="source_items" value="{{ stream.id }}" id="src_stream_{{ stream.id }}">
+                                                <label class="form-check-label" for="src_stream_{{ stream.id }}">
+                                                    <strong>{{ stream.name }}</strong> ({{ stream.code }})<br>
+                                                    <small class="text-muted">{{ stream.grade_level.name }}</small>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Grade Transfer Section -->
+                        <div id="grade_transfer_section" style="display:none;">
+                            <h6 class="fw-bold text-muted mb-3">Select Source Grade Levels</h6>
+                            <div class="row mb-4">
+                                {% for grade in grade_levels %}
+                                <div class="col-md-3 col-6 mb-2">
+                                    <div class="card border-success h-100">
+                                        <div class="card-body p-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" name="source_items" value="{{ grade.id }}" id="src_grade_{{ grade.id }}">
+                                                <label class="form-check-label" for="src_grade_{{ grade.id }}">
+                                                    <strong>{{ grade.name }}</strong><br>
+                                                    <small class="text-muted">{{ grade.curriculum.name }}</small>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Destination -->
+                        <div class="mb-4">
+                            <h6 class="fw-bold text-muted mb-3">Destination</h6>
+                            <div id="dest_stream_section">
+                                <label class="form-label">Select Destination Stream <span class="text-danger">*</span></label>
+                                <select class="form-select" name="dest_stream" id="dest_stream_select">
+                                    <option value="">-- Select Destination Stream --</option>
+                                    {% for stream in streams %}
+                                    <option value="{{ stream.id }}">{{ stream.grade_level.name }} - {{ stream.name }} ({{ stream.code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div id="dest_grade_section" style="display:none;">
+                                <label class="form-label">Select Destination Grade Level <span class="text-danger">*</span></label>
+                                <select class="form-select" name="dest_grade" id="dest_grade_select">
+                                    <option value="">-- Select Destination Grade Level --</option>
+                                    {% for grade in grade_levels %}
+                                    <option value="{{ grade.id }}">{{ grade.curriculum.name }} - {{ grade.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- What to Move -->
+                        <div class="mb-4">
+                            <h6 class="fw-bold text-muted mb-3">What to Transfer</h6>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="move_students" id="move_students" checked>
+                                <label class="form-check-label" for="move_students">
+                                    <i class="fas fa-user-graduate text-info"></i> Students
+                                </label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="checkbox" name="move_teachers" id="move_teachers" checked>
+                                <label class="form-check-label" for="move_teachers">
+                                    <i class="fas fa-chalkboard-teacher text-warning"></i> Teacher Assignments
+                                </label>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-exchange-alt"></i> Execute Bulk Transfer
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('transfer_stream').addEventListener('change', function() {
+    document.getElementById('stream_transfer_section').style.display = 'block';
+    document.getElementById('grade_transfer_section').style.display = 'none';
+    document.getElementById('dest_stream_section').style.display = 'block';
+    document.getElementById('dest_grade_section').style.display = 'none';
+    document.getElementById('dest_stream_select').required = true;
+    document.getElementById('dest_grade_select').required = false;
+});
+
+document.getElementById('transfer_grade').addEventListener('change', function() {
+    document.getElementById('stream_transfer_section').style.display = 'none';
+    document.getElementById('grade_transfer_section').style.display = 'block';
+    document.getElementById('dest_stream_section').style.display = 'none';
+    document.getElementById('dest_grade_section').style.display = 'block';
+    document.getElementById('dest_stream_select').required = false;
+    document.getElementById('dest_grade_select').required = true;
+});
+</script>
+{% endblock %}

@@ -36,7 +36,10 @@ urlpatterns = [
     path('stream/create/', setup_views.stream_create, name='stream_create'),
     path('stream/<int:stream_id>/edit/', setup_views.stream_edit, name='stream_edit'),
     path('stream/<int:stream_id>/delete/', setup_views.stream_delete, name='stream_delete'),
-    
+
+    # Bulk Transfer
+    path('bulk-transfer/', setup_views.bulk_transfer, name='bulk_transfer'),
+
     # Subject URLs
     path('subject/create/', setup_views.subject_create, name='subject_create'),
     path('subject/<int:subject_id>/edit/', setup_views.subject_edit, name='subject_edit'),

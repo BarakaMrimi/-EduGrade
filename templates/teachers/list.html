@@ -16,7 +16,18 @@
             <span class="badge bg-dark">{{ pending_requests|default:0 }}</span>
         </a>
     </div>
-    <span class="badge bg-success fs-6">{{ teachers.paginator.count|default:0 }} Total</span>
+    <div>
+        <span class="badge bg-success fs-6">{{ teachers.paginator.count|default:0 }} Total</span>
+        {% if show_all %}
+        <a href="{% url 'teachers:list' %}" class="btn btn-outline-primary btn-sm ms-2">
+            <i class="fas fa-filter"></i> Show Functional Only
+        </a>
+        {% else %}
+        <a href="{% url 'teachers:list' %}?show_all=1" class="btn btn-outline-secondary btn-sm ms-2">
+            <i class="fas fa-list"></i> Show All Teachers
+        </a>
+        {% endif %}
+    </div>
 </div>
 
 <!-- Filters -->
