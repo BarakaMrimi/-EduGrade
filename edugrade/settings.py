@@ -6,6 +6,8 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+# SECURITY
 SECRET_KEY = 'django-insecure-your-secret-key-here-change-in-production'
 
 DEBUG = True
@@ -13,8 +15,11 @@ DEBUG = True
 ALLOWED_HOSTS = [
     'localhost',
     '127.0.0.1',
+    'edugrade-icdk.onrender.com',
 ]
 
+
+# APPLICATIONS
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -36,6 +41,8 @@ INSTALLED_APPS = [
     'teachers',
 ]
 
+
+# MIDDLEWARE
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -46,8 +53,12 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+
+# URL CONFIGURATION
 ROOT_URLCONF = 'edugrade.urls'
 
+
+# TEMPLATES
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
@@ -65,8 +76,12 @@ TEMPLATES = [
     },
 ]
 
+
+# WSGI
 WSGI_APPLICATION = 'edugrade.wsgi.application'
 
+
+# DATABASE
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -77,6 +92,8 @@ DATABASES = {
     }
 }
 
+
+# PASSWORD VALIDATION
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -92,6 +109,8 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+
+# INTERNATIONALIZATION
 LANGUAGE_CODE = 'en-us'
 
 TIME_ZONE = 'Africa/Nairobi'
@@ -100,6 +119,8 @@ USE_I18N = True
 
 USE_TZ = True
 
+
+# STATIC FILES
 STATIC_URL = 'static/'
 
 STATICFILES_DIRS = [
@@ -108,12 +129,18 @@ STATICFILES_DIRS = [
 
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+
+# MEDIA FILES
 MEDIA_URL = 'media/'
 
 MEDIA_ROOT = BASE_DIR / 'media'
 
+
+# DEFAULT PRIMARY KEY
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+
+# AUTHENTICATION
 LOGIN_URL = 'authentication:login'
 
 LOGIN_REDIRECT_URL = 'core:dashboard'
