@@ -8,26 +8,23 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-username = os.environ.get("ADMIN_USERNAME")
+username = os.environ.get("ADMIN_USERNAME", "baraka")
 email = os.environ.get("ADMIN_EMAIL", "")
-password = os.environ.get("ADMIN_PASSWORD")
+password = os.environ.get("ADMIN_PASSWORD", "10203040")
 
-if not username or not password:
-    print("ADMIN_USERNAME or ADMIN_PASSWORD is not set.")
+user, created = User.objects.get_or_create(
+    username=username,
+    defaults={"email": email}
+)
+
+user.email = email
+user.is_active = True
+user.is_staff = True
+user.is_superuser = True
+user.set_password(password)
+user.save()
+
+if created:
+    print(f"Admin '{username}' created successfully.")
 else:
-    user, created = User.objects.get_or_create(
-        username=username,
-        defaults={
-            "email": email,
-            "is_staff": True,
-            "is_superuser": True,
-            "is_active": True,
-        },
-    )
-
-    if created:
-        user.set_password(password)
-        user.save()
-        print(f"Admin '{username}' created successfully.")
-    else:
-        print(f"Admin '{username}' already exists. No changes made.")
+    print(f"Admin '{username}' updated successfully.")
